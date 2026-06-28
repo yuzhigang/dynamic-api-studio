@@ -10,11 +10,10 @@ export type VarMapEntry = {
 
 export function buildOptionalConditionIndex(
   ast: unknown,
-  varMap: Record<string, VarMapEntry>
+  varMap: Record<string, VarMapEntry>,
 ): OptionalConditionIndex[] {
-  const results: OptionalConditionIndex[] = []
+  const conditions: OptionalConditionIndex[] = []
 
-  // Collect all param nodes with their paths
   function walk(node: unknown, path: string[]) {
     if (node === null || node === undefined || typeof node !== 'object') return
 
@@ -25,142 +24,141 @@ export function buildOptionalConditionIndex(
 
     const record = node as Record<string, unknown>
 
+    // Find param nodes with __var_N__ placeholders
     if (record.type === 'param' && typeof record.value === 'string') {
-      const placeholder = record.value
-      const entry = varMap[placeholder]
-      if (entry && entry.mode === 'optional') {
-        const enclosingBinary = findEnclosingBinaryExpr(ast, path)
-        if (enclosingBinary) {
-          const conditionType = determineConditionType(enclosingBinary.node)
-          if (conditionType === 'between-expr') {
-            const siblingPlaceholder = findSiblingPlaceholder(record, enclosingBinary.path, ast)
-            results.push({
-              variablePath: placeholder,
-              astPath: enclosingBinary.path,
-              conditionType,
-              siblingVariablePath: siblingPlaceholder ?? undefined,
-            })
-          } else {
-            results.push({
-              variablePath: placeholder,
-              astPath: enclosingBinary.path,
-              conditionType,
+      const match = record.value.match(/^__var_(\d+)__$/)
+      if (match) {
+        const placeholderKey = record.value
+        const entry = varMap[placeholderKey]
+        if (entry?.mode === 'optional') {
+          const condition = findEnclosingCondition(ast, path)
+          if (condition) {
+            conditions.push({
+              variablePath: placeholderKey,
+              astPath: condition.astPath,
+              conditionType: condition.conditionType,
+              siblingVariablePath: condition.siblingVariablePath,
             })
           }
         }
       }
-      return
+      return // don't recurse into param
     }
 
     for (const [key, value] of Object.entries(record)) {
-      if (value !== null && typeof value === 'object') {
+      if (typeof value === 'object') {
         walk(value, [...path, key])
       }
     }
   }
 
-  function findEnclosingBinaryExpr(
-    root: unknown,
-    paramPath: string[]
-  ): { node: Record<string, unknown>; path: string[] } | null {
-    // Walk up the path to find the nearest binary_expr that is a condition boundary.
-    // Prefer OR or BETWEEN; fallback to any binary_expr.
-    let fallback: { node: Record<string, unknown>; path: string[] } | null = null
+  walk(ast, [])
 
-    for (let i = paramPath.length; i >= 1; i--) {
-      const candidatePath = paramPath.slice(0, i)
-      const candidate = getNodeAtPath(root, candidatePath)
-      if (
-        candidate &&
-        typeof candidate === 'object' &&
-        !Array.isArray(candidate) &&
-        (candidate as Record<string, unknown>).type === 'binary_expr'
-      ) {
-        const record = candidate as Record<string, unknown>
-        const operator =
-          typeof record.operator === 'string' ? record.operator.toUpperCase() : ''
-        if (operator === 'OR' || operator === 'BETWEEN') {
-          return { node: record, path: candidatePath }
-        }
-        if (!fallback) {
-          fallback = { node: record, path: candidatePath }
-        }
-      }
-    }
+  // Deduplicate entries with same variablePath + astPath (keep first)
+  const seen = new Set<string>()
+  return conditions.filter((condition) => {
+    const key = `${condition.variablePath}:${condition.astPath.join('.')}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 
-    return fallback
-  }
+function findEnclosingCondition(
+  root: unknown,
+  paramPath: string[],
+): { astPath: string[]; conditionType: OptionalConditionIndex['conditionType']; siblingVariablePath?: string } | null {
+  // Walk up the path to find candidate binary_expr nodes
+  for (let i = paramPath.length - 1; i >= 0; i--) {
+    const candidatePath = paramPath.slice(0, i)
+    const node = getNodeAtPath(root, candidatePath)
 
-  function determineConditionType(
-    binaryNode: Record<string, unknown>
-  ): 'and-condition' | 'or-block' | 'between-expr' {
-    const operator =
-      typeof binaryNode.operator === 'string' ? binaryNode.operator.toUpperCase() : ''
+    if (!isBinaryExpr(node)) continue
+
+    const operator = (node as Record<string, unknown>).operator
+    const left = (node as Record<string, unknown>).left
+    const right = (node as Record<string, unknown>).right
+
+    // Verify the param is actually a descendant of this binary_expr's left or right branch
+    const paramKey = paramPath[i]
+    const isDirectOperand =
+      paramKey === 'left' ||
+      paramKey === 'right' ||
+      (paramKey === 'value' && candidatePath[candidatePath.length - 1] === 'right')
+
+    if (!isDirectOperand) continue
 
     if (operator === 'BETWEEN') {
-      return 'between-expr'
+      const sibling = findSiblingInBetween(node, paramPath)
+      return {
+        astPath: candidatePath,
+        conditionType: 'between-expr',
+        siblingVariablePath: sibling,
+      }
     }
+
     if (operator === 'OR') {
-      return 'or-block'
-    }
-    return 'and-condition'
-  }
-
-  function findSiblingPlaceholder(
-    paramNode: Record<string, unknown>,
-    binaryPath: string[],
-    rootAst: unknown
-  ): string | null {
-    const betweenNode = getNodeAtPath(rootAst, binaryPath)
-    if (!betweenNode || typeof betweenNode !== 'object' || Array.isArray(betweenNode)) {
-      return null
+      return { astPath: candidatePath, conditionType: 'or-block' }
     }
 
-    const record = betweenNode as Record<string, unknown>
-    const right = record.right
-    if (!right || typeof right !== 'object' || Array.isArray(right)) {
-      return null
+    if (operator === 'AND') {
+      return { astPath: candidatePath, conditionType: 'and-condition' }
     }
 
-    const rightRecord = right as Record<string, unknown>
-    const values = rightRecord.value
-    if (!Array.isArray(values)) {
-      return null
-    }
-
-    for (const item of values) {
-      if (item && typeof item === 'object' && !Array.isArray(item)) {
-        const itemRecord = item as Record<string, unknown>
-        if (
-          itemRecord.type === 'param' &&
-          typeof itemRecord.value === 'string' &&
-          itemRecord.value !== paramNode.value
-        ) {
-          return itemRecord.value
-        }
+    // Comparison operators (=, <>, <, >, etc.)
+    // Check if this comparison is a direct operand of an OR parent
+    const parentPath = candidatePath.slice(0, -1)
+    const parentNode = parentPath.length > 0 ? getNodeAtPath(root, parentPath) : null
+    if (isBinaryExpr(parentNode) && (parentNode as Record<string, unknown>).operator === 'OR') {
+      const childKey = candidatePath[candidatePath.length - 1]
+      if (childKey === 'left' || childKey === 'right') {
+        return { astPath: parentPath, conditionType: 'or-block' }
       }
     }
 
-    return null
+    return { astPath: candidatePath, conditionType: 'and-condition' }
   }
 
-  function getNodeAtPath(root: unknown, path: string[]): unknown {
-    let current: unknown = root
-    for (const segment of path) {
-      if (current === null || current === undefined) return undefined
-      if (Array.isArray(current)) {
-        const index = parseInt(segment, 10)
-        if (isNaN(index)) return undefined
-        current = current[index]
-      } else if (typeof current === 'object') {
-        current = (current as Record<string, unknown>)[segment]
-      } else {
-        return undefined
-      }
+  return null
+}
+
+function isBinaryExpr(node: unknown): node is Record<string, unknown> {
+  return typeof node === 'object' && node !== null && (node as Record<string, unknown>).type === 'binary_expr'
+}
+
+function getNodeAtPath(root: unknown, path: string[]): unknown {
+  let current: unknown = root
+  for (const key of path) {
+    if (current === null || current === undefined) return undefined
+    if (Array.isArray(current)) {
+      current = current[Number(key)]
+    } else if (typeof current === 'object') {
+      current = (current as Record<string, unknown>)[key]
+    } else {
+      return undefined
     }
-    return current
+  }
+  return current
+}
+
+function findSiblingInBetween(
+  betweenNode: Record<string, unknown>,
+  paramPath: string[],
+): string | undefined {
+  const right = betweenNode.right
+  if (!right || typeof right !== 'object' || !Array.isArray((right as Record<string, unknown>).value)) {
+    return undefined
   }
 
-  walk(ast, [])
-  return results
+  const values = (right as Record<string, unknown>).value as Array<Record<string, unknown>>
+  const paramKey = paramPath[paramPath.length - 1]
+  const paramIndex = Number(paramKey)
+
+  if (Number.isNaN(paramIndex)) return undefined
+
+  const sibling = values[paramIndex === 0 ? 1 : 0]
+  if (sibling?.type === 'param' && typeof sibling.value === 'string') {
+    return sibling.value
+  }
+  return undefined
 }

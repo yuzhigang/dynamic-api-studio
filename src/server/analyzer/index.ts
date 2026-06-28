@@ -18,6 +18,8 @@ export class EnhancedSqlAnalyzer {
       ast: null,
       variableRefs: variables.map((v) => ({
         raw: v.raw,
+        from: v.from,
+        to: v.to,
         namespace: 'input' as const,
         name: v.name,
         fullPath: `$input.${v.name}`,

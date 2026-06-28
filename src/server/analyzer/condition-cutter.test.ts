@@ -73,13 +73,21 @@ describe('buildOptionalConditionIndex', () => {
     expect(result[0].astPath).toEqual(result[1].astPath)
   })
 
-  it('handles mixed required and optional in same query', () => {
-    const sql = 'SELECT * FROM users WHERE id = $input.id AND status = $input.status?'
-    const result = analyze(sql)
-    expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      variablePath: '__var_1__',
-      conditionType: 'and-condition',
-    })
+  it('indexes optional variables inside IN clauses', () => {
+    const sql = 'SELECT * FROM users WHERE status IN ($input.status?)'
+    const { processedSql, varMap } = preprocessSql(sql)
+    const ast = parseSql(processedSql, 'postgresql')
+    const index = buildOptionalConditionIndex(ast, varMap)
+    expect(index).toHaveLength(1)
+    expect(index[0]).toMatchObject({ variablePath: '__var_0__', conditionType: 'and-condition' })
+  })
+
+  it('indexes nested optional conditions correctly', () => {
+    const sql = 'SELECT * FROM users WHERE (a = $input.a? AND b = 1) OR c = 2'
+    const { processedSql, varMap } = preprocessSql(sql)
+    const ast = parseSql(processedSql, 'postgresql')
+    const index = buildOptionalConditionIndex(ast, varMap)
+    expect(index).toHaveLength(1)
+    expect(index[0]).toMatchObject({ variablePath: '__var_0__', conditionType: 'and-condition' })
   })
 })

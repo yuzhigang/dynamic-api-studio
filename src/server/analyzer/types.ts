@@ -10,6 +10,12 @@ export type VariableRef = {
   /** 原始文本，如 "$.region?" */
   raw: string
 
+  /** 变量在 SQL 原文中的起始位置 */
+  from: number
+
+  /** 变量在 SQL 原文中的结束位置 */
+  to: number
+
   /** 命名空间 */
   namespace: VariableSource
 

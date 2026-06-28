@@ -33,6 +33,8 @@ export function extractVariablesFromSql(sql: string): VariableRef[] {
 
     refs.push({
       raw,
+      from: match.index!,
+      to: match.index! + raw.length,
       namespace,
       name: path,
       fullPath,
@@ -49,10 +51,10 @@ export function extractVariablesFromSql(sql: string): VariableRef[] {
 
 export function preprocessSql(sql: string): {
   processedSql: string
-  varMap: Record<string, { raw: string; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }>
+  varMap: Record<string, { raw: string; from: number; to: number; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }>
 } {
   VARIABLE_PATTERN.lastIndex = 0
-  const varMap: Record<string, { raw: string; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }> = {}
+  const varMap: Record<string, { raw: string; from: number; to: number; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }> = {}
   let counter = 0
 
   const processedSql = sql.replace(VARIABLE_PATTERN, (raw, prefix, path, suffix, offset) => {
@@ -67,7 +69,7 @@ export function preprocessSql(sql: string): {
     const placeholderKey = `__var_${counter}__`
     counter++
 
-    varMap[placeholderKey] = { raw, namespace, name: path, fullPath, mode }
+    varMap[placeholderKey] = { raw, from: offset, to: offset + raw.length, namespace, name: path, fullPath, mode }
     return `:${placeholderKey}`
   })
 
