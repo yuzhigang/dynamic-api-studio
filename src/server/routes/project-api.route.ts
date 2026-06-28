@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { ApiDefinitionRepository } from '@/server/domains/api-definition/api-definition.repository'
 import { ApiDefinitionService } from '@/server/domains/api-definition/api-definition.service'
 import { ApiTestService } from '@/server/domains/api-test/api-test.service'
+import { DataSourceRepository } from '@/server/domains/data-source/data-source.repository'
 import { projectRepository } from '@/server/routes/project.route'
 import {
   apiDefinitionDraftSchema,
@@ -11,7 +12,8 @@ import {
 } from '@/shared/contracts/api-definition.contract'
 
 const apiDefinitionService = new ApiDefinitionService(new ApiDefinitionRepository())
-const apiTestService = new ApiTestService()
+const dataSourceRepository = new DataSourceRepository()
+const apiTestService = new ApiTestService((id) => dataSourceRepository.get(id))
 
 export const projectApiRoute = new Hono()
   .get('/:projectId/apis', (context) => {
@@ -59,9 +61,9 @@ export const projectApiRoute = new Hono()
       }),
     )
   })
-  .post('/:projectId/apis/test-draft', zValidator('json', apiTestRequestSchema), (context) =>
-    context.json(apiTestService.run(context.req.valid('json'))),
+  .post('/:projectId/apis/test-draft', zValidator('json', apiTestRequestSchema), async (context) =>
+    context.json(await apiTestService.run(context.req.valid('json'))),
   )
-  .post('/:projectId/apis/:apiId/test', zValidator('json', apiTestRequestSchema), (context) =>
-    context.json(apiTestService.run(context.req.valid('json'))),
+  .post('/:projectId/apis/:apiId/test', zValidator('json', apiTestRequestSchema), async (context) =>
+    context.json(await apiTestService.run(context.req.valid('json'))),
   )
