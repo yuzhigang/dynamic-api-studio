@@ -12,6 +12,7 @@ import { projectApiRoute } from '@/server/routes/project-api.route'
 import { projectVariableRoute } from '@/server/routes/project-variable.route'
 import { projectRoute } from '@/server/routes/project.route'
 import { sqlAnalyzeRoute } from '@/server/routes/sql-analyze.route'
+import { sqlTestRoute } from '@/server/routes/sql-test.route'
 import { taskRoute } from '@/server/routes/task.route'
 
 const app = new Hono<AppBindings>().basePath('/api')
@@ -29,6 +30,7 @@ app
   .route('/global-variables', globalVariableRoute)
   .route('/metadata', metadataRoute)
   .route('/sql', sqlAnalyzeRoute)
+  .route('/sql', sqlTestRoute)
   .route('/tasks', taskRoute)
 
 app.notFound((context) =>

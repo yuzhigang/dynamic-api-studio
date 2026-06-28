@@ -9,7 +9,7 @@ export function variableLinter(symbols: SymbolItem[]): Extension {
   return linter((view) => {
     const diagnostics = []
     const source = view.state.doc.toString()
-    const pattern = /\$([a-zA-Z_][\w.]*)([?!])?/g
+    const pattern = /\$(input|\.)([a-zA-Z_][\w.]*)([?!])?/g
 
     for (const match of source.matchAll(pattern)) {
       const raw = match[0]
