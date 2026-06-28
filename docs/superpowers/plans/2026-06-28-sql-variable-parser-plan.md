@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, `node-sql-parser`, Knex, Hono, CodeMirror 6, Vitest
 
+> **Implementation note:** `node-sql-parser` cannot parse `$variable` syntax directly. Therefore, variables are preprocessed into `:__var_N__` placeholders before parsing, and placeholder locations are mapped back to original variables in the AST. `oracle` dialect falls back to the PostgreSQL parser because `node-sql-parser` does not natively support Oracle.
+
 ---
 
 ## 文件结构
