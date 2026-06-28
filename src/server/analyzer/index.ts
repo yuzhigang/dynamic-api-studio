@@ -1,19 +1,51 @@
 import { extractVariablesFromSql } from '@/server/analyzer/variable-extractor'
+import type { SqlDialect, CompiledSqlPlan } from '@/server/analyzer/types'
 
 type AnalyzeInput = {
   sql: string
-  dialect?: string
+  dialect?: SqlDialect
 }
 
 export class EnhancedSqlAnalyzer {
-  analyze(input: AnalyzeInput) {
+  analyze(input: AnalyzeInput): CompiledSqlPlan {
+    const variables = extractVariablesFromSql(input.sql)
     return {
-      dialect: input.dialect ?? 'postgresql',
-      variables: extractVariablesFromSql(input.sql),
-      warnings: [],
-      previewSql: input.sql.replace(/\$([a-zA-Z_][\w.]*)([?!])?/g, '?'),
+      sourceHash: '',
+      schemaHash: '',
+      dialect: (input.dialect ?? 'postgresql') as SqlDialect,
+      processedSql: input.sql.replace(/\$([a-zA-Z_][\w.]*)([?!])?/g, '?'),
+      varMap: {},
+      ast: null,
+      variableRefs: variables.map((v) => ({
+        raw: v.raw,
+        namespace: 'input' as const,
+        name: v.name,
+        fullPath: `$input.${v.name}`,
+        mode: v.mode,
+        sqlKind: 'value' as const,
+        dataType: 'string',
+        astPath: [],
+      })),
+      aliasMap: {},
+      optionalConditions: [],
+      staticDiagnostics: [],
+      references: [],
     }
   }
 }
 
 export { extractVariablesFromSql } from '@/server/analyzer/variable-extractor'
+export type {
+  SqlDialect,
+  VariableSource,
+  VariableMode,
+  SqlKind,
+  VariableRef,
+  OptionalConditionIndex,
+  StaticDiagnostic,
+  StepReference,
+  VariableInfo,
+  CompiledSqlPlan,
+  RenderResult,
+} from '@/server/analyzer/types'
+

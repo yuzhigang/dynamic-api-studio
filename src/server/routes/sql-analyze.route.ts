@@ -6,7 +6,7 @@ import { EnhancedSqlAnalyzer } from '@/server/analyzer'
 
 const analyzeRequestSchema = z.object({
   sql: z.string(),
-  dialect: z.string().optional(),
+  dialect: z.enum(['postgresql', 'mysql', 'oracle', 'sqlserver']).optional(),
 })
 
 const analyzer = new EnhancedSqlAnalyzer()
