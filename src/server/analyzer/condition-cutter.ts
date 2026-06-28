@@ -76,8 +76,6 @@ function findEnclosingCondition(
     if (!isBinaryExpr(node)) continue
 
     const operator = (node as Record<string, unknown>).operator
-    const left = (node as Record<string, unknown>).left
-    const right = (node as Record<string, unknown>).right
 
     // Verify the param is actually a descendant of this binary_expr's left or right branch
     const paramKey = paramPath[i]

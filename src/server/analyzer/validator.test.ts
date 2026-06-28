@@ -7,7 +7,7 @@ function makeRef(partial: Partial<VariableRef> & { raw: string }, from = 0): Var
     from,
     to: from + partial.raw.length,
     namespace: partial.namespace ?? 'global',
-    name: partial.name ?? partial.raw.replace(/^[\$.]+/, '').replace(/[?!]$/, ''),
+    name: partial.name ?? partial.raw.replace(/^[$.]+/, '').replace(/[?!]$/, ''),
     fullPath: partial.fullPath ?? partial.raw.replace(/[?!]$/, ''),
     mode: partial.mode ?? 'required',
     sqlKind: partial.sqlKind ?? 'value',

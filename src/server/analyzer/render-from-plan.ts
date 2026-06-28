@@ -1,4 +1,4 @@
-import type { CompiledSqlPlan, RenderResult, VariableSource } from '@/server/analyzer/types'
+import type { CompiledSqlPlan, RenderResult } from '@/server/analyzer/types'
 import { stringifyAst } from '@/server/analyzer/parser-wrapper'
 
 export function renderFromPlan(
@@ -110,7 +110,7 @@ function cleanupAst(node: unknown) {
   }
 
   // Recurse into children
-  for (const [key, value] of Object.entries(record)) {
+  for (const value of Object.values(record)) {
     if (typeof value === 'object' && value !== null) {
       cleanupAst(value)
     }

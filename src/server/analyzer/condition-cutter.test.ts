@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { parseSql } from '@/server/analyzer/parser-wrapper'
 import { preprocessSql } from '@/server/analyzer/variable-extractor'
 import { buildOptionalConditionIndex } from '@/server/analyzer/condition-cutter'
-import type { VariableMode } from '@/server/analyzer/types'
 
 describe('buildOptionalConditionIndex', () => {
   function analyze(sql: string) {
