@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage
+*.local
+src/routeTree.gen.ts

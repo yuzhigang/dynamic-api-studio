@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resizable Test</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "react-resizable-panels": "https://esm.sh/react-resizable-panels@4.11.2"
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; }
+    .panel { display: flex; align-items: center; justify-content: center; font-size: 24px; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+
+    function App() {
+      return (
+        React.createElement(PanelGroup, { direction: 'horizontal', style: { height: '100vh' } },
+          React.createElement(Panel, { defaultSize: 45, minSize: 30 },
+            React.createElement('div', { className: 'panel', style: { background: '#e2e8f0' } }, 'Left')
+          ),
+          React.createElement(PanelResizeHandle, { style: { width: '24px', background: '#94a3b8', cursor: 'col-resize' } }),
+          React.createElement(Panel, { defaultSize: 55, minSize: 40 },
+            React.createElement('div', { className: 'panel', style: { background: '#cbd5e1' } }, 'Right')
+          )
+        )
+      );
+    }
+
+    createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>

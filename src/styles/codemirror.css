@@ -1,0 +1,22 @@
+.cm-editor {
+  height: 100%;
+  min-height: 100%;
+  font-family:
+    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+}
+
+.cm-scroller {
+  overflow: auto;
+}
+
+.cm-gutters {
+  border-right: 1px solid hsl(var(--border));
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.cm-editor.cm-focused {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
