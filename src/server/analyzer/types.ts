@@ -90,3 +90,8 @@ export type RenderResult = {
   sql: string
   params: Array<{ value: unknown; type: string }>
 }
+
+export type AstVariableLocation = {
+  raw: string
+  astPath: string[]
+}

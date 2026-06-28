@@ -34,7 +34,7 @@ export class EnhancedSqlAnalyzer {
   }
 }
 
-export { extractVariablesFromSql } from '@/server/analyzer/variable-extractor'
+export { extractVariablesFromSql, preprocessSql } from '@/server/analyzer/variable-extractor'
 export type {
   SqlDialect,
   VariableSource,

@@ -13,6 +13,18 @@ describe('parser-wrapper', () => {
     expect(firstAst(ast).type).toBe('select')
   })
 
+  it('handles multi-statement SQL as AST array', () => {
+    const ast = parseSql('SELECT 1; SELECT 2', 'postgresql')
+    expect(Array.isArray(ast)).toBe(true)
+    if (Array.isArray(ast)) {
+      expect(ast).toHaveLength(2)
+    }
+  })
+
+  it('throws on invalid SQL', () => {
+    expect(() => parseSql('SELECT * FROM', 'postgresql')).toThrow()
+  })
+
   it('maps dialect names to parser dialect', () => {
     expect(toParserDialect('postgresql')).toBe('PostgreSQL')
     expect(toParserDialect('mysql')).toBe('MySQL')

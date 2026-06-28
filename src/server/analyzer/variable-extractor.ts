@@ -13,6 +13,7 @@ function resolveMode(suffix: string | undefined): VariableMode {
 }
 
 export function extractVariablesFromSql(sql: string): VariableRef[] {
+  VARIABLE_PATTERN.lastIndex = 0
   const refs: VariableRef[] = []
 
   for (const match of sql.matchAll(VARIABLE_PATTERN)) {
@@ -44,4 +45,31 @@ export function extractVariablesFromSql(sql: string): VariableRef[] {
   }
 
   return refs
+}
+
+export function preprocessSql(sql: string): {
+  processedSql: string
+  varMap: Record<string, { raw: string; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }>
+} {
+  VARIABLE_PATTERN.lastIndex = 0
+  const varMap: Record<string, { raw: string; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }> = {}
+  let counter = 0
+
+  const processedSql = sql.replace(VARIABLE_PATTERN, (raw, prefix, path, suffix, offset) => {
+    const matchEndIndex = offset + raw.length
+    if (sql[matchEndIndex] === '(') {
+      return raw
+    }
+
+    const namespace = resolveNamespace(prefix)
+    const fullPath = `$${prefix}${path}`
+    const mode = resolveMode(suffix)
+    const placeholderKey = `__var_${counter}__`
+    counter++
+
+    varMap[placeholderKey] = { raw, namespace, name: path, fullPath, mode }
+    return `:${placeholderKey}`
+  })
+
+  return { processedSql, varMap }
 }
