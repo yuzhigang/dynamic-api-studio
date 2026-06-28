@@ -1,3 +1,11 @@
+export type AnalyzeInput = {
+  sql: string
+  dialect?: SqlDialect
+  inputNames?: string[]
+  globalNames?: string[]
+  defaults?: Record<string, unknown>
+}
+
 export type SqlDialect = 'postgresql' | 'mysql' | 'oracle' | 'sqlserver'
 
 export type VariableSource = 'input' | 'global'
