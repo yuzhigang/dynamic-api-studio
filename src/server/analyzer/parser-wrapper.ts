@@ -7,6 +7,7 @@ const parser = new Parser()
 const dialectMap: Record<SqlDialect, string> = {
   postgresql: 'PostgreSQL',
   mysql: 'MySQL',
+  oracle: 'PostgreSQL', // node-sql-parser does not support Oracle; fallback to PostgreSQL parser
   sqlserver: 'TransactSQL',
 }
 

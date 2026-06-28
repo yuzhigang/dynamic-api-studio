@@ -1,6 +1,6 @@
-import type { SqlVariableReference } from '@/server/analyzer/variable-extractor'
+import type { VariableRef } from '@/server/analyzer/types'
 
-export function validateVariableReferences(variables: SqlVariableReference[]) {
+export function validateVariableReferences(variables: VariableRef[]) {
   return variables.map((variable) => ({
     variable: variable.raw,
     valid: Boolean(variable.name),
