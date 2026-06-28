@@ -8,3 +8,4 @@ dist-ssr
 coverage
 *.local
 src/routeTree.gen.ts
+.worktrees/
