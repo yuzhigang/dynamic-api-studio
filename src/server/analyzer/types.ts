@@ -34,7 +34,7 @@ export type VariableReference = {
   /** 变量在 SQL 原文中的结束位置 */
   to: number
 
-  /** 不带后缀的完整路径，如 "$.region" */
+  /** 完整变量路径，包含模式后缀、数组标记和属性访问，如 "$.region?"、"$orders[].id" */
   fullPath: string
 
   /** 该变量在 SQL 中扮演的角色 */

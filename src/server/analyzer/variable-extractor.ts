@@ -1,6 +1,11 @@
 import type { VariableMode, VariableReference, VariableScope } from '@/server/analyzer/types'
 
-const VARIABLE_PATTERN = /\$(input\.|\.|)([a-zA-Z_][\w.]*)([?!])?(\[\])?(?:\.([a-zA-Z_][\w.]*))?/g
+const DOTTED_IDENTIFIER = '[a-zA-Z_]\\w*(?:\\.[a-zA-Z_]\\w*)*'
+
+const VARIABLE_PATTERN = new RegExp(
+  `\\$(input\\.|\\.|)(${DOTTED_IDENTIFIER})([?!])?(\\[\\])?(?:\\.(${DOTTED_IDENTIFIER}))?(?![\\w.])`,
+  'g',
+)
 
 function resolveScope(prefix: string): VariableScope {
   if (prefix === 'input.') return 'input'
@@ -32,6 +37,24 @@ function buildVariableMeta(
   return { scope, name, fullPath, mode, propertyPath }
 }
 
+function isFollowedByFunctionCall(sql: string, matchEndIndex: number): boolean {
+  let index = matchEndIndex
+  while (index < sql.length && /\s/.test(sql[index])) {
+    index++
+  }
+  return sql[index] === '('
+}
+
+type PreprocessVarMapEntry = {
+  raw: string
+  from: number
+  to: number
+  scope: VariableScope
+  name: string
+  fullPath: string
+  mode: VariableMode
+}
+
 export function extractVariablesFromSql(sql: string): VariableReference[] {
   VARIABLE_PATTERN.lastIndex = 0
   const refs: VariableReference[] = []
@@ -44,9 +67,9 @@ export function extractVariablesFromSql(sql: string): VariableReference[] {
     const arrayMarker = match[4]
     const property = match[5]
 
-    // Reject if the match is immediately followed by '(' (function call)
+    // Reject if the match is followed by optional whitespace and '(' (function call)
     const matchEndIndex = match.index! + raw.length
-    if (sql[matchEndIndex] === '(') {
+    if (isFollowedByFunctionCall(sql, matchEndIndex)) {
       continue
     }
 
@@ -73,15 +96,15 @@ export function extractVariablesFromSql(sql: string): VariableReference[] {
 
 export function preprocessSql(sql: string): {
   processedSql: string
-  varMap: Record<string, { raw: string; from: number; to: number; scope: VariableScope; name: string; fullPath: string; mode: VariableMode }>
+  varMap: Record<string, PreprocessVarMapEntry>
 } {
   VARIABLE_PATTERN.lastIndex = 0
-  const varMap: Record<string, { raw: string; from: number; to: number; scope: VariableScope; name: string; fullPath: string; mode: VariableMode }> = {}
+  const varMap: Record<string, PreprocessVarMapEntry> = {}
   let counter = 0
 
   const processedSql = sql.replace(VARIABLE_PATTERN, (raw, prefix, baseName, suffix, arrayMarker, property, offset) => {
     const matchEndIndex = offset + raw.length
-    if (sql[matchEndIndex] === '(') {
+    if (isFollowedByFunctionCall(sql, matchEndIndex)) {
       return raw
     }
 
