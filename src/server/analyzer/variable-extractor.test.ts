@@ -26,6 +26,18 @@ describe('extractVariablesFromSql', () => {
     })
   })
 
+  it('extracts bare $xxx variables as global scope', () => {
+    const result = extractVariablesFromSql('SELECT * FROM t WHERE id = $orders')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      raw: '$orders',
+      scope: 'global',
+      name: 'orders',
+      fullPath: '$orders',
+      mode: 'required',
+    })
+  })
+
   it('detects optional and defaulted modes', () => {
     const result = extractVariablesFromSql('WHERE a = $input.a? AND b = $.b!')
     expect(result).toEqual([
@@ -39,9 +51,14 @@ describe('extractVariablesFromSql', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('does not treat $inputname as $input.name', () => {
+  it('parses $inputname as a bare global variable, not $input.name', () => {
     const result = extractVariablesFromSql('WHERE id = $inputname')
-    expect(result).toHaveLength(0)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      scope: 'global',
+      name: 'inputname',
+      fullPath: '$inputname',
+    })
   })
 })
 
@@ -51,6 +68,12 @@ describe('preprocessSql', () => {
     expect(result.processedSql).toBe('WHERE id = :__var_0__ AND region = :__var_1__')
     expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', scope: 'input' })
     expect(result.varMap['__var_1__']).toMatchObject({ raw: '$.region?', scope: 'global', mode: 'optional' })
+  })
+
+  it('preprocesses bare $xxx variables as global scope', () => {
+    const result = preprocessSql('WHERE id = $orders')
+    expect(result.processedSql).toBe('WHERE id = :__var_0__')
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$orders', scope: 'global' })
   })
 
   it('rejects function calls and leaves SQL unchanged', () => {

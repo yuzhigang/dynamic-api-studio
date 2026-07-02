@@ -1,9 +1,10 @@
 import type { VariableMode, VariableRef, VariableScope } from '@/server/analyzer/types'
 
-const VARIABLE_PATTERN = /\$(input\.|\.)([a-zA-Z_][\w.]*)([?!])?/g
+const VARIABLE_PATTERN = /\$(input\.|\.|)([a-zA-Z_][\w.]*)([?!])?/g
 
 function resolveScope(prefix: string): VariableScope {
-  return prefix === 'input.' ? 'input' : 'global'
+  if (prefix === 'input.') return 'input'
+  return 'global'
 }
 
 function resolveMode(suffix: string | undefined): VariableMode {
