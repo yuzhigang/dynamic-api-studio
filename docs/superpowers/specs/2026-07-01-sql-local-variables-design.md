@@ -10,12 +10,12 @@ Dynamic API Studio 的 SQL 编辑器需要支持三类变量引用：
 
 当前实现存在以下问题：
 
-1. `$xxx` 被错误识别为 `global` namespace
+1. `$xxx` 被错误识别为 `global` scope
 2. 不支持 `$orders[].id` 这类数组属性访问
 3. API 设计时变量和步骤输出变量没有统一模型
 4. 表达式求值和 SQL 渲染使用两套上下文
 
-本设计引入统一的 `VariableContext`，规范变量命名空间、local 变量模型、表达式引擎、SQL 渲染和工作流执行规则。
+本设计引入统一的 `VariableContext`，规范变量作用域、local 变量模型、表达式引擎、SQL 渲染和工作流执行规则。
 
 ---
 
@@ -28,7 +28,7 @@ Dynamic API Studio 的 SQL 编辑器需要支持三类变量引用：
 ### 1.2 核心接口
 
 ```ts
-export type VariableNamespace = 'input' | 'global' | 'local'
+export type VariableScope = 'input' | 'global' | 'local'
 
 export type VariableValue = {
   value: unknown
@@ -39,31 +39,31 @@ export type VariableValue = {
 }
 
 export type VariableContext = {
-  has(namespace: VariableNamespace, name: string): boolean
-  get(namespace: VariableNamespace, name: string): VariableValue | undefined
-  set(namespace: VariableNamespace, name: string, value: VariableValue): void
-  keys(namespace: VariableNamespace): string[]
+  has(scope: VariableScope, name: string): boolean
+  get(scope: VariableScope, name: string): VariableValue | undefined
+  set(scope: VariableScope, name: string, value: VariableValue): void
+  keys(scope: VariableScope): string[]
   merge(other: VariableContext): VariableContext
 }
 ```
 
 ### 1.3 变量唯一标识
 
-变量在内部统一用 `{ namespace, name }` 标识：
+变量在内部统一用 `{ scope, name }` 标识：
 
-- `$input.pageSize` → `{ namespace: 'input', name: 'pageSize' }`
-- `$.tenantId` → `{ namespace: 'global', name: 'tenantId' }`
-- `$orders` → `{ namespace: 'local', name: 'orders' }`
-- `$orders[].id` → 基础变量 `{ namespace: 'local', name: 'orders' }`，访问路径 `['id']`
+- `$input.pageSize` → `{ scope: 'input', name: 'pageSize' }`
+- `$.tenantId` → `{ scope: 'global', name: 'tenantId' }`
+- `$orders` → `{ scope: 'local', name: 'orders' }`
+- `$orders[].id` → 基础变量 `{ scope: 'local', name: 'orders' }`，访问路径 `['id']`
 
 ---
 
-## 2. 变量命名空间与引用语法
+## 2. 变量作用域与引用语法
 
 ### 2.1 语法规则
 
-| 写法 | namespace | mode | 说明 |
-|------|-----------|------|------|
+| 写法 | scope | mode | 说明 |
+| ---- | ----- | ---- | ---- |
 | `$input.xxx` | `input` | required | API 查询参数 |
 | `$input.xxx?` | `input` | optional | 为空时删除所在条件 |
 | `$input.xxx!` | `input` | defaulted | 为空时使用默认值 |
@@ -75,7 +75,7 @@ export type VariableContext = {
 
 ```ts
 export type VariableReference = {
-  namespace: VariableNamespace
+  scope: VariableScope
   name: string
   mode: 'required' | 'optional' | 'defaulted'
   propertyPath?: string[]        // ['id'] for $orders[].id
@@ -87,7 +87,7 @@ export type VariableReference = {
 
 ### 2.3 关键规则
 
-1. **所有 namespace 统一后缀语义**：
+1. **所有 scope 统一后缀语义**：
    - 无后缀 → required
    - `?` → optional
    - `!` → defaulted
@@ -225,7 +225,7 @@ SQL 查询步骤的输出 schema 从 SELECT 列表推断：
 
 ```ts
 function resolveVariableValue(ref: VariableReference, context: VariableContext): unknown {
-  const variable = context.get(ref.namespace, ref.name)
+  const variable = context.get(ref.scope, ref.name)
   if (!variable) {
     if (ref.mode === 'optional') return undefined
     if (ref.mode === 'defaulted') return getDefaultValue(ref)
@@ -295,7 +295,7 @@ function transformExpression(code: string): string {
 
 ### 6.3 上下文构造
 
-从 `VariableContext` 中提取三个 namespace 的值，构造表达式执行上下文：
+从 `VariableContext` 中提取三个 scope 的值，构造表达式执行上下文：
 
 ```ts
 function buildExpressionContext(context: VariableContext): ExpressionContext {
@@ -412,7 +412,7 @@ API 变量定义区的表达式编辑器也用同一套补全，但过滤掉当�
 
 ### 8.1 单元测试
 
-- `variable-extractor`：覆盖所有 namespace、模式后缀、数组属性访问
+- `variable-extractor`：覆盖所有 scope、模式后缀、数组属性访问
 - `validator`：覆盖未定义变量、类型不匹配、顺序引用
 - `render-from-plan`：覆盖变量取值、数组展开、optional 条件裁剪、defaulted 默认值
 - `expression-evaluator`：覆盖变量替换、函数调用、算术运算
@@ -435,7 +435,7 @@ API 变量定义区的表达式编辑器也用同一套补全，但过滤掉当�
 
 涉及文件（预估）：
 
-- `src/server/analyzer/types.ts`：扩展 `VariableSource` 为 `VariableNamespace`，新增 `VariableContext`
+- `src/server/analyzer/types.ts`：扩展 `VariableSource` 为 `VariableScope`，新增 `VariableContext`
 - `src/server/analyzer/variable-extractor.ts`：修改正则，支持 local 和数组属性访问
 - `src/server/analyzer/validator.ts`：基于 `VariableContext` 校验
 - `src/server/analyzer/render-from-plan.ts`：统一取值，支持数组属性展开
