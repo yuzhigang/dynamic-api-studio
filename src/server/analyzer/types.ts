@@ -109,3 +109,63 @@ export type AstVariableLocation = {
   raw: string
   astPath: string[]
 }
+
+export type VariableScope = 'input' | 'global' | 'local'
+
+export type VariableValue = {
+  value: unknown
+  type: string
+  itemType?: string
+  nullable?: boolean
+  defaultValue?: unknown
+}
+
+export type VariableContext = {
+  has(scope: VariableScope, name: string): boolean
+  get(scope: VariableScope, name: string): VariableValue | undefined
+  set(scope: VariableScope, name: string, value: VariableValue): void
+  keys(scope: VariableScope): string[]
+  clone(): VariableContext
+  merge(other: VariableContext): VariableContext
+}
+
+export function createVariableContext(): VariableContext {
+  const store: Record<VariableScope, Record<string, VariableValue>> = {
+    input: {},
+    global: {},
+    local: {},
+  }
+
+  return {
+    has(scope, name) {
+      return name in store[scope]
+    },
+    get(scope, name) {
+      return store[scope][name]
+    },
+    set(scope, name, value) {
+      store[scope][name] = value
+    },
+    keys(scope) {
+      return Object.keys(store[scope])
+    },
+    clone() {
+      const next = createVariableContext()
+      for (const scope of ['input', 'global', 'local'] as VariableScope[]) {
+        for (const name of this.keys(scope)) {
+          next.set(scope, name, this.get(scope, name)!)
+        }
+      }
+      return next
+    },
+    merge(other) {
+      const next = this.clone()
+      for (const scope of ['input', 'global', 'local'] as VariableScope[]) {
+        for (const name of other.keys(scope)) {
+          next.set(scope, name, other.get(scope, name)!)
+        }
+      }
+      return next
+    },
+  }
+}
