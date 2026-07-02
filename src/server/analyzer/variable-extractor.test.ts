@@ -26,15 +26,54 @@ describe('extractVariablesFromSql', () => {
     })
   })
 
-  it('extracts bare $xxx variables as global scope', () => {
+  it('extracts bare $xxx variables as local scope', () => {
     const result = extractVariablesFromSql('SELECT * FROM t WHERE id = $orders')
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       raw: '$orders',
-      scope: 'global',
+      scope: 'local',
       name: 'orders',
       fullPath: '$orders',
       mode: 'required',
+    })
+  })
+
+  it('parses array property access $orders[].id as local', () => {
+    const result = extractVariablesFromSql('SELECT * FROM t WHERE order_id IN ($orders[].id)')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      raw: '$orders[].id',
+      scope: 'local',
+      name: 'orders',
+      propertyPath: ['id'],
+      fullPath: '$orders[].id',
+      mode: 'required',
+    })
+  })
+
+  it('parses optional array property access $orders?[].id', () => {
+    const result = extractVariablesFromSql('SELECT * FROM t WHERE order_id IN ($orders?[].id)')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      raw: '$orders?[].id',
+      scope: 'local',
+      name: 'orders',
+      propertyPath: ['id'],
+      fullPath: '$orders?[].id',
+      mode: 'optional',
+    })
+  })
+
+  it('parses defaulted array property access $orders![].id', () => {
+    const result = extractVariablesFromSql('SELECT * FROM t WHERE order_id IN ($orders![].id)')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      raw: '$orders![].id',
+      scope: 'local',
+      name: 'orders',
+      propertyPath: ['id'],
+      fullPath: '$orders![].id',
+      mode: 'defaulted',
     })
   })
 
@@ -51,11 +90,11 @@ describe('extractVariablesFromSql', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('parses $inputname as a bare global variable, not $input.name', () => {
+  it('parses $inputname as a bare local variable, not $input.name', () => {
     const result = extractVariablesFromSql('WHERE id = $inputname')
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
-      scope: 'global',
+      scope: 'local',
       name: 'inputname',
       fullPath: '$inputname',
     })
@@ -70,10 +109,21 @@ describe('preprocessSql', () => {
     expect(result.varMap['__var_1__']).toMatchObject({ raw: '$.region?', scope: 'global', mode: 'optional' })
   })
 
-  it('preprocesses bare $xxx variables as global scope', () => {
+  it('preprocesses bare $xxx variables as local scope', () => {
     const result = preprocessSql('WHERE id = $orders')
     expect(result.processedSql).toBe('WHERE id = :__var_0__')
-    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$orders', scope: 'global' })
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$orders', scope: 'local' })
+  })
+
+  it('preprocesses array property access $orders[].id as one token', () => {
+    const result = preprocessSql('WHERE order_id IN ($orders[].id)')
+    expect(result.processedSql).toBe('WHERE order_id IN (:__var_0__)')
+    expect(result.varMap['__var_0__']).toMatchObject({
+      raw: '$orders[].id',
+      scope: 'local',
+      name: 'orders',
+      fullPath: '$orders[].id',
+    })
   })
 
   it('rejects function calls and leaves SQL unchanged', () => {
