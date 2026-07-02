@@ -3,6 +3,7 @@ export type AnalyzeInput = {
   dialect?: SqlDialect
   inputNames?: string[]
   globalNames?: string[]
+  localNames?: string[]
   defaults?: Record<string, unknown>
 }
 
