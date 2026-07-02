@@ -34,7 +34,7 @@ export function validateVariableReferences(
         from: variable.from,
         to: variable.to,
         severity: 'error',
-        message: `defaulted 变量 ${variable.name} 缺少默认值`,
+        message: `默认变量 ${variable.name} 缺少默认值`,
       })
     }
   }
