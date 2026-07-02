@@ -47,7 +47,7 @@ function resolveVariableValue(
 ): unknown {
   const info = plan.varMap[placeholderKey]
   if (!info) return undefined
-  if (info.namespace === 'input') return actualParams.input[info.name]
+  if (info.scope === 'input') return actualParams.input[info.name]
   return actualParams.global[info.name]
 }
 
@@ -199,7 +199,7 @@ function walkAndReplaceParams(
           value = info.defaultValue
         }
 
-        const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
+        const fullPath = info.scope === 'input' ? `$input.${info.name}` : `$.${info.name}`
         if (value === undefined) {
           throw new Error(`变量 ${fullPath} 没有值`)
         }
@@ -238,7 +238,7 @@ function walkAndReplaceParams(
                 resolvedValue = info.defaultValue
               }
 
-              const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
+              const fullPath = info.scope === 'input' ? `$input.${info.name}` : `$.${info.name}`
               if (resolvedValue === undefined) {
                 throw new Error(`变量 ${fullPath} 没有值`)
               }
@@ -260,7 +260,7 @@ function walkAndReplaceParams(
               resolvedValue = info.defaultValue
             }
 
-            const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
+            const fullPath = info.scope === 'input' ? `$input.${info.name}` : `$.${info.name}`
             if (resolvedValue === undefined) {
               throw new Error(`变量 ${fullPath} 没有值`)
             }

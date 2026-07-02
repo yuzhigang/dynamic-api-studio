@@ -1,8 +1,8 @@
-import type { OptionalConditionIndex } from '@/server/analyzer/types'
+import type { OptionalConditionIndex, VariableScope } from '@/server/analyzer/types'
 
 export type VarMapEntry = {
   raw: string
-  namespace: 'input' | 'global'
+  scope: VariableScope
   name: string
   fullPath: string
   mode: 'required' | 'optional' | 'defaulted'

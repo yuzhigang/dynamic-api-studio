@@ -1,8 +1,8 @@
-import type { VariableMode, VariableRef, VariableSource } from '@/server/analyzer/types'
+import type { VariableMode, VariableRef, VariableScope } from '@/server/analyzer/types'
 
 const VARIABLE_PATTERN = /\$(input\.|\.)([a-zA-Z_][\w.]*)([?!])?/g
 
-function resolveNamespace(prefix: string): VariableSource {
+function resolveScope(prefix: string): VariableScope {
   return prefix === 'input.' ? 'input' : 'global'
 }
 
@@ -28,14 +28,14 @@ export function extractVariablesFromSql(sql: string): VariableRef[] {
       continue
     }
 
-    const namespace = resolveNamespace(prefix)
+    const scope = resolveScope(prefix)
     const fullPath = `$${prefix}${path}`
 
     refs.push({
       raw,
       from: match.index!,
       to: match.index! + raw.length,
-      namespace,
+      scope,
       name: path,
       fullPath,
       mode: resolveMode(suffix),
@@ -51,10 +51,10 @@ export function extractVariablesFromSql(sql: string): VariableRef[] {
 
 export function preprocessSql(sql: string): {
   processedSql: string
-  varMap: Record<string, { raw: string; from: number; to: number; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }>
+  varMap: Record<string, { raw: string; from: number; to: number; scope: VariableScope; name: string; fullPath: string; mode: VariableMode }>
 } {
   VARIABLE_PATTERN.lastIndex = 0
-  const varMap: Record<string, { raw: string; from: number; to: number; namespace: VariableSource; name: string; fullPath: string; mode: VariableMode }> = {}
+  const varMap: Record<string, { raw: string; from: number; to: number; scope: VariableScope; name: string; fullPath: string; mode: VariableMode }> = {}
   let counter = 0
 
   const processedSql = sql.replace(VARIABLE_PATTERN, (raw, prefix, path, suffix, offset) => {
@@ -63,13 +63,13 @@ export function preprocessSql(sql: string): {
       return raw
     }
 
-    const namespace = resolveNamespace(prefix)
+    const scope = resolveScope(prefix)
     const fullPath = `$${prefix}${path}`
     const mode = resolveMode(suffix)
     const placeholderKey = `__var_${counter}__`
     counter++
 
-    varMap[placeholderKey] = { raw, from: offset, to: offset + raw.length, namespace, name: path, fullPath, mode }
+    varMap[placeholderKey] = { raw, from: offset, to: offset + raw.length, scope, name: path, fullPath, mode }
     return `:${placeholderKey}`
   })
 

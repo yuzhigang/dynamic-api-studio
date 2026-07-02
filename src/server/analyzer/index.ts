@@ -49,7 +49,7 @@ export class EnhancedSqlAnalyzer {
     const varMap: CompiledSqlPlan['varMap'] = {}
     for (const [key, value] of Object.entries(preprocessVarMap)) {
       varMap[key] = {
-        namespace: value.namespace,
+        scope: value.scope,
         name: value.name,
         dataType: 'string', // TODO: infer from JSON Schema
         defaultValue: input.defaults?.[value.name],
@@ -85,7 +85,6 @@ export {
 } from '@/server/analyzer/types'
 export type {
   SqlDialect,
-  VariableSource,
   VariableMode,
   SqlKind,
   VariableRef,

@@ -8,13 +8,23 @@ export type AnalyzeInput = {
 
 export type SqlDialect = 'postgresql' | 'mysql' | 'oracle' | 'sqlserver'
 
-export type VariableSource = 'input' | 'global'
-
 export type VariableMode = 'required' | 'optional' | 'defaulted'
 
 export type SqlKind = 'value' | 'field' | 'keyword' | 'like-pattern'
 
-export type VariableRef = {
+export type VariableReference = {
+  /** 作用域 */
+  scope: VariableScope
+
+  /** 变量名，如 "region"、"status" */
+  name: string
+
+  /** 变量模式 */
+  mode: VariableMode
+
+  /** 数组 / 对象属性访问路径，如 $orders[].id 对应 ['id'] */
+  propertyPath?: string[]
+
   /** 原始文本，如 "$.region?" */
   raw: string
 
@@ -24,17 +34,8 @@ export type VariableRef = {
   /** 变量在 SQL 原文中的结束位置 */
   to: number
 
-  /** 命名空间 */
-  namespace: VariableSource
-
-  /** 变量名，如 "region"、"status" */
-  name: string
-
   /** 不带后缀的完整路径，如 "$.region" */
   fullPath: string
-
-  /** 变量模式 */
-  mode: VariableMode
 
   /** 该变量在 SQL 中扮演的角色 */
   sqlKind: SqlKind
@@ -51,6 +52,9 @@ export type VariableRef = {
   /** 如果是 field/keyword，x-sql.map 白名单 key */
   xSqlMap?: string
 }
+
+// 临时兼容：VariableRef 逐步替换为 VariableReference
+export type VariableRef = VariableReference
 
 export type OptionalConditionIndex = {
   /** 关联的变量路径，例如 "$.status?" */
@@ -79,7 +83,7 @@ export type StepReference = {
 }
 
 export type VariableInfo = {
-  namespace: VariableSource
+  scope: VariableScope
   name: string
   dataType: string
   defaultValue?: unknown

@@ -6,7 +6,7 @@ function makeRef(partial: Partial<VariableRef> & { raw: string }, from = 0): Var
   return {
     from,
     to: from + partial.raw.length,
-    namespace: partial.namespace ?? 'global',
+    scope: partial.scope ?? 'global',
     name: partial.name ?? partial.raw.replace(/^[$.]+/, '').replace(/[?!]$/, ''),
     fullPath: partial.fullPath ?? partial.raw.replace(/[?!]$/, ''),
     mode: partial.mode ?? 'required',
@@ -20,7 +20,7 @@ function makeRef(partial: Partial<VariableRef> & { raw: string }, from = 0): Var
 describe('validateVariableReferences', () => {
   it('reports unknown global variables', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.unknown', namespace: 'global', name: 'unknown', fullPath: '$.unknown', mode: 'required' }),
+      makeRef({ raw: '$.unknown', scope: 'global', name: 'unknown', fullPath: '$.unknown', mode: 'required' }),
     ]
     const diagnostics = validateVariableReferences(refs, { inputNames: [], globalNames: ['known'] })
     expect(diagnostics).toHaveLength(1)
@@ -29,7 +29,7 @@ describe('validateVariableReferences', () => {
 
   it('reports missing default for defaulted mode', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.pageSize!', namespace: 'global', name: 'pageSize', fullPath: '$.pageSize', mode: 'defaulted', dataType: 'integer' }),
+      makeRef({ raw: '$.pageSize!', scope: 'global', name: 'pageSize', fullPath: '$.pageSize', mode: 'defaulted', dataType: 'integer' }),
     ]
     const diagnostics = validateVariableReferences(refs, { inputNames: [], globalNames: ['pageSize'], defaults: {} })
     expect(diagnostics[0].message).toContain('默认值')
@@ -37,8 +37,8 @@ describe('validateVariableReferences', () => {
 
   it('returns empty diagnostics for valid references', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.region', namespace: 'global', name: 'region', fullPath: '$.region', mode: 'required' }),
-      makeRef({ raw: '$input.status', namespace: 'input', name: 'status', fullPath: '$input.status', mode: 'required' }),
+      makeRef({ raw: '$.region', scope: 'global', name: 'region', fullPath: '$.region', mode: 'required' }),
+      makeRef({ raw: '$input.status', scope: 'input', name: 'status', fullPath: '$input.status', mode: 'required' }),
     ]
     const diagnostics = validateVariableReferences(refs, {
       inputNames: ['status'],
@@ -49,7 +49,7 @@ describe('validateVariableReferences', () => {
 
   it('reports function call patterns', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.getMin(1, 2)', namespace: 'global', name: 'getMin(1, 2)', fullPath: '$.getMin(1, 2)', mode: 'required' }),
+      makeRef({ raw: '$.getMin(1, 2)', scope: 'global', name: 'getMin(1, 2)', fullPath: '$.getMin(1, 2)', mode: 'required' }),
     ]
     const diagnostics = validateVariableReferences(refs, { inputNames: [], globalNames: [] })
     expect(diagnostics).toHaveLength(1)
@@ -58,7 +58,7 @@ describe('validateVariableReferences', () => {
 
   it('reports unknown input variables', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$input.missing', namespace: 'input', name: 'missing', fullPath: '$input.missing', mode: 'required' }),
+      makeRef({ raw: '$input.missing', scope: 'input', name: 'missing', fullPath: '$input.missing', mode: 'required' }),
     ]
     const diagnostics = validateVariableReferences(refs, { inputNames: ['known'], globalNames: [] })
     expect(diagnostics).toHaveLength(1)
@@ -68,7 +68,7 @@ describe('validateVariableReferences', () => {
 
   it('accepts falsy-but-defined defaults', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.pageSize!', namespace: 'global', name: 'pageSize', fullPath: '$.pageSize', mode: 'defaulted', dataType: 'integer' }),
+      makeRef({ raw: '$.pageSize!', scope: 'global', name: 'pageSize', fullPath: '$.pageSize', mode: 'defaulted', dataType: 'integer' }),
     ]
 
     // default = 0
@@ -98,9 +98,9 @@ describe('validateVariableReferences', () => {
 
   it('accumulates multiple errors in one call', () => {
     const refs: VariableRef[] = [
-      makeRef({ raw: '$.a', namespace: 'global', name: 'a', fullPath: '$.a', mode: 'required' }),
-      makeRef({ raw: '$input.b', namespace: 'input', name: 'b', fullPath: '$input.b', mode: 'required' }),
-      makeRef({ raw: '$.c!', namespace: 'global', name: 'c', fullPath: '$.c', mode: 'defaulted' }),
+      makeRef({ raw: '$.a', scope: 'global', name: 'a', fullPath: '$.a', mode: 'required' }),
+      makeRef({ raw: '$input.b', scope: 'input', name: 'b', fullPath: '$input.b', mode: 'required' }),
+      makeRef({ raw: '$.c!', scope: 'global', name: 'c', fullPath: '$.c', mode: 'defaulted' }),
     ]
     const diagnostics = validateVariableReferences(refs, {
       inputNames: [],
@@ -114,7 +114,7 @@ describe('validateVariableReferences', () => {
   })
 
   it('preserves source positions in diagnostics', () => {
-    const refs: VariableRef[] = [makeRef({ raw: '$.unknown', namespace: 'global', name: 'unknown' }, 15)]
+    const refs: VariableRef[] = [makeRef({ raw: '$.unknown', scope: 'global', name: 'unknown' }, 15)]
     const diagnostics = validateVariableReferences(refs, { inputNames: [], globalNames: ['known'] })
     expect(diagnostics[0]).toMatchObject({ from: 15, to: 24 })
   })

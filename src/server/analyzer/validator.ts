@@ -23,7 +23,7 @@ export function validateVariableReferences(
       continue
     }
 
-    if (variable.namespace === 'input' && !context.inputNames.includes(variable.name)) {
+    if (variable.scope === 'input' && !context.inputNames.includes(variable.name)) {
       diagnostics.push({
         from: variable.from,
         to: variable.to,
@@ -33,7 +33,7 @@ export function validateVariableReferences(
       continue
     }
 
-    if (variable.namespace === 'global' && !context.globalNames.includes(variable.name)) {
+    if (variable.scope === 'global' && !context.globalNames.includes(variable.name)) {
       diagnostics.push({
         from: variable.from,
         to: variable.to,

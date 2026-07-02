@@ -7,7 +7,7 @@ describe('extractVariablesFromSql', () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       raw: '$input.id',
-      namespace: 'input',
+      scope: 'input',
       name: 'id',
       fullPath: '$input.id',
       mode: 'required',
@@ -19,7 +19,7 @@ describe('extractVariablesFromSql', () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       raw: '$.region',
-      namespace: 'global',
+      scope: 'global',
       name: 'region',
       fullPath: '$.region',
       mode: 'required',
@@ -49,8 +49,8 @@ describe('preprocessSql', () => {
   it('preprocesses SQL by replacing variables with placeholders', () => {
     const result = preprocessSql('WHERE id = $input.id AND region = $.region?')
     expect(result.processedSql).toBe('WHERE id = :__var_0__ AND region = :__var_1__')
-    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', namespace: 'input' })
-    expect(result.varMap['__var_1__']).toMatchObject({ raw: '$.region?', namespace: 'global', mode: 'optional' })
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', scope: 'input' })
+    expect(result.varMap['__var_1__']).toMatchObject({ raw: '$.region?', scope: 'global', mode: 'optional' })
   })
 
   it('rejects function calls and leaves SQL unchanged', () => {
@@ -63,8 +63,8 @@ describe('preprocessSql', () => {
     const result = preprocessSql('WHERE id = $input.id AND other_id = $input.id')
     expect(result.processedSql).toBe('WHERE id = :__var_0__ AND other_id = :__var_1__')
     expect(Object.keys(result.varMap)).toHaveLength(2)
-    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', namespace: 'input' })
-    expect(result.varMap['__var_1__']).toMatchObject({ raw: '$input.id', namespace: 'input' })
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', scope: 'input' })
+    expect(result.varMap['__var_1__']).toMatchObject({ raw: '$input.id', scope: 'input' })
   })
 
   it('returns empty varMap for empty SQL', () => {
@@ -76,13 +76,13 @@ describe('preprocessSql', () => {
   it('handles variables at the end of the string', () => {
     const result = preprocessSql('WHERE id = $input.id')
     expect(result.processedSql).toBe('WHERE id = :__var_0__')
-    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', namespace: 'input' })
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$input.id', scope: 'input' })
   })
 
   it('preprocesses correctly after extractVariablesFromSql has been called', () => {
     extractVariablesFromSql('WHERE a = $input.a')
     const result = preprocessSql('WHERE b = $.b')
     expect(result.processedSql).toBe('WHERE b = :__var_0__')
-    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$.b', namespace: 'global' })
+    expect(result.varMap['__var_0__']).toMatchObject({ raw: '$.b', scope: 'global' })
   })
 })
