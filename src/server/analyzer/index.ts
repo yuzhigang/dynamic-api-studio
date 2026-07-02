@@ -6,7 +6,7 @@ import { locateVariablesInAst } from '@/server/analyzer/ast-variable-locator'
 import { buildOptionalConditionIndex } from '@/server/analyzer/condition-cutter'
 import { validateVariableReferences } from '@/server/analyzer/validator'
 import { resolveTableAliases } from '@/server/analyzer/alias-resolver'
-import type { AnalyzeInput, CompiledSqlPlan, VariableRef } from '@/server/analyzer/types'
+import type { AnalyzeInput, CompiledSqlPlan, VariableReference } from '@/server/analyzer/types'
 
 export class EnhancedSqlAnalyzer {
   analyze(input: AnalyzeInput): CompiledSqlPlan {
@@ -32,7 +32,7 @@ export class EnhancedSqlAnalyzer {
     }
 
     // Match extracted refs to AST locations via placeholder key
-    const variableRefs: VariableRef[] = extracted.map((ref) => {
+    const variableRefs: VariableReference[] = extracted.map((ref) => {
       const placeholderKey = positionToPlaceholder.get(ref.from)
       const astPath = placeholderKey ? pathByPlaceholder.get(placeholderKey) ?? [] : []
       return { ...ref, astPath }
@@ -87,7 +87,7 @@ export type {
   SqlDialect,
   VariableMode,
   SqlKind,
-  VariableRef,
+  VariableReference,
   VariableScope,
   VariableValue,
   VariableContext,

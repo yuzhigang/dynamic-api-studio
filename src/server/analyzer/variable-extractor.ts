@@ -1,4 +1,4 @@
-import type { VariableMode, VariableRef, VariableScope } from '@/server/analyzer/types'
+import type { VariableMode, VariableReference, VariableScope } from '@/server/analyzer/types'
 
 const VARIABLE_PATTERN = /\$(input\.|\.|)([a-zA-Z_][\w.]*)([?!])?/g
 
@@ -13,9 +13,9 @@ function resolveMode(suffix: string | undefined): VariableMode {
   return 'required'
 }
 
-export function extractVariablesFromSql(sql: string): VariableRef[] {
+export function extractVariablesFromSql(sql: string): VariableReference[] {
   VARIABLE_PATTERN.lastIndex = 0
-  const refs: VariableRef[] = []
+  const refs: VariableReference[] = []
 
   for (const match of sql.matchAll(VARIABLE_PATTERN)) {
     const raw = match[0]

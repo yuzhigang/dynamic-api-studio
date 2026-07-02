@@ -1,4 +1,4 @@
-import type { StaticDiagnostic, VariableRef } from '@/server/analyzer/types'
+import type { StaticDiagnostic, VariableReference } from '@/server/analyzer/types'
 
 export type ValidationContext = {
   inputNames: string[]
@@ -7,7 +7,7 @@ export type ValidationContext = {
 }
 
 export function validateVariableReferences(
-  variables: VariableRef[],
+  variables: VariableReference[],
   context: ValidationContext,
 ): StaticDiagnostic[] {
   const diagnostics: StaticDiagnostic[] = []

@@ -53,9 +53,6 @@ export type VariableReference = {
   xSqlMap?: string
 }
 
-// 临时兼容：VariableRef 逐步替换为 VariableReference
-export type VariableRef = VariableReference
-
 export type OptionalConditionIndex = {
   /** 关联的变量路径，例如 "$.status?" */
   variablePath: string
@@ -97,7 +94,7 @@ export type CompiledSqlPlan = {
   varMap: Record<string, VariableInfo>
   /** 预解析的 AST（可序列化存储） TODO: replace `unknown` with concrete SerializedAst once AST shape stabilizes */
   ast: unknown
-  variableRefs: VariableRef[]
+  variableRefs: VariableReference[]
   aliasMap: Record<string, string>
   optionalConditions: OptionalConditionIndex[]
   staticDiagnostics: StaticDiagnostic[]
