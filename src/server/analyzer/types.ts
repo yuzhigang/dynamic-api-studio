@@ -110,8 +110,13 @@ export type AstVariableLocation = {
   astPath: string[]
 }
 
-export type VariableScope = 'input' | 'global' | 'local'
+/** 变量作用域常量集合，避免在 clone/merge 中硬编码作用域列表 */
+export const VARIABLE_SCOPES = ['input', 'global', 'local'] as const
 
+/** SQL 变量作用域：输入参数 / 全局变量 / API 局部变量 */
+export type VariableScope = (typeof VARIABLE_SCOPES)[number]
+
+/** 变量在上下文中的包装值，包含原始值与类型元数据 */
 export type VariableValue = {
   value: unknown
   type: string
@@ -120,6 +125,7 @@ export type VariableValue = {
   defaultValue?: unknown
 }
 
+/** 变量上下文接口，按作用域统一管理变量的存取、克隆与合并 */
 export type VariableContext = {
   has(scope: VariableScope, name: string): boolean
   get(scope: VariableScope, name: string): VariableValue | undefined
@@ -129,6 +135,7 @@ export type VariableContext = {
   merge(other: VariableContext): VariableContext
 }
 
+/** 创建空的变量上下文，支持 input / global / local 三个作用域 */
 export function createVariableContext(): VariableContext {
   const store: Record<VariableScope, Record<string, VariableValue>> = {
     input: {},
@@ -151,18 +158,21 @@ export function createVariableContext(): VariableContext {
     },
     clone() {
       const next = createVariableContext()
-      for (const scope of ['input', 'global', 'local'] as VariableScope[]) {
-        for (const name of this.keys(scope)) {
-          next.set(scope, name, this.get(scope, name)!)
+      for (const scope of VARIABLE_SCOPES) {
+        for (const [name, value] of Object.entries(store[scope])) {
+          next.set(scope, name, structuredClone(value))
         }
       }
       return next
     },
     merge(other) {
       const next = this.clone()
-      for (const scope of ['input', 'global', 'local'] as VariableScope[]) {
+      for (const scope of VARIABLE_SCOPES) {
         for (const name of other.keys(scope)) {
-          next.set(scope, name, other.get(scope, name)!)
+          const value = other.get(scope, name)
+          if (value !== undefined) {
+            next.set(scope, name, structuredClone(value))
+          }
         }
       }
       return next

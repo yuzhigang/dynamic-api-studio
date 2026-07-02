@@ -79,12 +79,19 @@ export class EnhancedSqlAnalyzer {
 }
 
 export { extractVariablesFromSql, preprocessSql } from '@/server/analyzer/variable-extractor'
+export {
+  createVariableContext,
+  VARIABLE_SCOPES,
+} from '@/server/analyzer/types'
 export type {
   SqlDialect,
   VariableSource,
   VariableMode,
   SqlKind,
   VariableRef,
+  VariableScope,
+  VariableValue,
+  VariableContext,
   OptionalConditionIndex,
   StaticDiagnostic,
   StepReference,
