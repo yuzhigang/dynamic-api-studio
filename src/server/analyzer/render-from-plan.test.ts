@@ -5,13 +5,26 @@ import { renderFromPlan } from '@/server/analyzer/render-from-plan'
 const analyzer = new EnhancedSqlAnalyzer()
 
 describe('renderFromPlan', () => {
+  it('expands $orders[].id for IN clause', () => {
+    const plan = analyzer.analyze({
+      sql: 'SELECT * FROM detail WHERE order_id IN ($orders[].id)',
+      dialect: 'postgresql',
+      localNames: ['orders'],
+    })
+    const result = renderFromPlan(plan, { input: {}, global: {}, local: { orders: [{ id: 1 }, { id: 2 }, { id: 3 }] } })
+
+    expect(result.sql).toContain('IN (?, ?, ?)')
+    expect(result.params.map((p) => p.value)).toEqual([1, 2, 3])
+  })
+
   it('renders required variables', () => {
     const plan = analyzer.analyze({
       sql: 'SELECT * FROM users WHERE id = $input.id',
       dialect: 'postgresql',
       inputNames: ['id'],
     })
-    const result = renderFromPlan(plan, { input: { id: 42 }, global: {} })
+    const result = renderFromPlan(plan, { input: { id: 42 }, global: {},
+      local: {}, })
 
     expect(result.sql.toLowerCase()).toContain('where')
     expect(result.params).toHaveLength(1)
@@ -24,7 +37,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       inputNames: ['status'],
     })
-    const result = renderFromPlan(plan, { input: {}, global: {} })
+    const result = renderFromPlan(plan, { input: {}, global: {},
+      local: {}, })
 
     expect(result.sql.toLowerCase()).not.toContain('status')
   })
@@ -36,7 +50,8 @@ describe('renderFromPlan', () => {
       inputNames: ['pageSize'],
       defaults: { pageSize: 10 },
     })
-    const result = renderFromPlan(plan, { input: {}, global: {} })
+    const result = renderFromPlan(plan, { input: {}, global: {},
+      local: {}, })
 
     expect(result.params[0].value).toBe(10)
   })
@@ -48,7 +63,8 @@ describe('renderFromPlan', () => {
       inputNames: ['id'],
     })
 
-    expect(() => renderFromPlan(plan, { input: {}, global: {} })).toThrow('变量')
+    expect(() => renderFromPlan(plan, { input: {}, global: {},
+      local: {}, })).toThrow('变量')
   })
 
   it('expands array values for IN clause', () => {
@@ -57,7 +73,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       inputNames: ['statuses'],
     })
-    const result = renderFromPlan(plan, { input: { statuses: ['active', 'pending'] }, global: {} })
+    const result = renderFromPlan(plan, { input: { statuses: ['active', 'pending'] }, global: {},
+      local: {}, })
 
     expect(result.params).toHaveLength(2)
     expect(result.params[0]).toEqual({ value: 'active', type: 'string' })
@@ -70,7 +87,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       globalNames: ['tenantId'],
     })
-    const result = renderFromPlan(plan, { input: {}, global: { tenantId: 't-123' } })
+    const result = renderFromPlan(plan, { input: {}, global: { tenantId: 't-123' },
+      local: {}, })
 
     expect(result.params).toHaveLength(1)
     expect(result.params[0]).toEqual({ value: 't-123', type: 'string' })
@@ -82,7 +100,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       inputNames: ['status'],
     })
-    const result = renderFromPlan(plan, { input: { status: 'active' }, global: {} })
+    const result = renderFromPlan(plan, { input: { status: 'active' }, global: {},
+      local: {}, })
 
     expect(result.sql.toLowerCase()).toContain('status')
     expect(result.params).toHaveLength(1)
@@ -96,10 +115,12 @@ describe('renderFromPlan', () => {
       inputNames: ['start', 'end'],
     })
 
-    const result1 = renderFromPlan(plan, { input: { start: '2024-01-01' }, global: {} })
+    const result1 = renderFromPlan(plan, { input: { start: '2024-01-01' }, global: {},
+      local: {}, })
     expect(result1.sql.toLowerCase()).not.toContain('between')
 
-    const result2 = renderFromPlan(plan, { input: { end: '2024-12-31' }, global: {} })
+    const result2 = renderFromPlan(plan, { input: { end: '2024-12-31' }, global: {},
+      local: {}, })
     expect(result2.sql.toLowerCase()).not.toContain('between')
   })
 
@@ -109,7 +130,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       inputNames: ['start', 'end'],
     })
-    const result = renderFromPlan(plan, { input: { start: '2024-01-01', end: '2024-12-31' }, global: {} })
+    const result = renderFromPlan(plan, { input: { start: '2024-01-01', end: '2024-12-31' }, global: {},
+      local: {}, })
 
     expect(result.sql.toLowerCase()).toContain('between')
     expect(result.params).toHaveLength(2)
@@ -121,7 +143,8 @@ describe('renderFromPlan', () => {
       dialect: 'postgresql',
       inputNames: ['id', 'status'],
     })
-    const result = renderFromPlan(plan, { input: { id: 1 }, global: {} })
+    const result = renderFromPlan(plan, { input: { id: 1 }, global: {},
+      local: {}, })
 
     expect(result.sql.toLowerCase()).toContain('where')
     expect(result.sql.toLowerCase()).not.toContain('status')
@@ -136,7 +159,8 @@ describe('renderFromPlan', () => {
 
     // Empty array produces no placeholders, resulting in invalid SQL (IN ()).
     // Current behavior: renders empty expr_list; caller should validate upstream.
-    const result = renderFromPlan(plan, { input: { statuses: [] }, global: {} })
+    const result = renderFromPlan(plan, { input: { statuses: [] }, global: {},
+      local: {}, })
     expect(result.sql).toContain('IN ()')
     expect(result.params).toHaveLength(0)
   })
@@ -148,15 +172,18 @@ describe('renderFromPlan', () => {
       inputNames: ['a', 'b'],
     })
 
-    const result1 = renderFromPlan(plan, { input: { a: 1 }, global: {} })
+    const result1 = renderFromPlan(plan, { input: { a: 1 }, global: {},
+      local: {}, })
     expect(result1.sql.toLowerCase()).toContain('a')
     expect(result1.sql.toLowerCase()).not.toContain('b')
 
-    const result2 = renderFromPlan(plan, { input: { b: 2 }, global: {} })
+    const result2 = renderFromPlan(plan, { input: { b: 2 }, global: {},
+      local: {}, })
     expect(result2.sql.toLowerCase()).not.toContain('a')
     expect(result2.sql.toLowerCase()).toContain('b')
 
-    const result3 = renderFromPlan(plan, { input: {}, global: {} })
+    const result3 = renderFromPlan(plan, { input: {}, global: {},
+      local: {}, })
     expect(result3.sql.toLowerCase()).not.toContain('a')
     expect(result3.sql.toLowerCase()).not.toContain('b')
   })
@@ -169,10 +196,12 @@ describe('renderFromPlan', () => {
     })
     const originalAst = JSON.stringify(plan.ast)
 
-    renderFromPlan(plan, { input: { id: 1 }, global: {} })
+    renderFromPlan(plan, { input: { id: 1 }, global: {},
+      local: {}, })
     expect(JSON.stringify(plan.ast)).toBe(originalAst)
 
-    renderFromPlan(plan, { input: { id: 99 }, global: {} })
+    renderFromPlan(plan, { input: { id: 99 }, global: {},
+      local: {}, })
     expect(JSON.stringify(plan.ast)).toBe(originalAst)
   })
 
@@ -185,7 +214,8 @@ describe('renderFromPlan', () => {
     })
 
     // Optional variables are removed when empty, not filled with defaults
-    const result = renderFromPlan(plan, { input: {}, global: {} })
+    const result = renderFromPlan(plan, { input: {}, global: {},
+      local: {}, })
     expect(result.sql.toLowerCase()).not.toContain('status')
     expect(result.params).toHaveLength(0)
   })

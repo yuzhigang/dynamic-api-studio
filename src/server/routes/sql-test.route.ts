@@ -26,6 +26,7 @@ export const sqlTestRoute = new Hono().post(
     const result = renderFromPlan(plan, {
       input: body.params,
       global: body.globalValues ?? {},
+      local: {},
     })
 
     return context.json({

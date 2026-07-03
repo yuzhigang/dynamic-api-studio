@@ -84,7 +84,9 @@ export type VariableInfo = {
   scope: VariableScope
   name: string
   dataType: string
+  mode: VariableMode
   defaultValue?: unknown
+  propertyPath?: string[]
 }
 
 export type CompiledSqlPlan = {

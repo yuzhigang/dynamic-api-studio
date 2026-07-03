@@ -64,7 +64,9 @@ export class EnhancedSqlAnalyzer {
         scope: value.scope,
         name: value.name,
         dataType: 'string', // TODO: infer from JSON Schema
+        mode: value.mode,
         defaultValue: input.defaults?.[value.name],
+        propertyPath: value.propertyPath,
       }
     }
 

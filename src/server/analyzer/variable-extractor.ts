@@ -53,6 +53,7 @@ type PreprocessVarMapEntry = {
   name: string
   fullPath: string
   mode: VariableMode
+  propertyPath?: string[]
 }
 
 export function extractVariablesFromSql(sql: string): VariableReference[] {
@@ -112,7 +113,16 @@ export function preprocessSql(sql: string): {
     const placeholderKey = `__var_${counter}__`
     counter++
 
-    varMap[placeholderKey] = { raw, from: offset, to: offset + raw.length, scope: meta.scope, name: meta.name, fullPath: meta.fullPath, mode: meta.mode }
+    varMap[placeholderKey] = {
+      raw,
+      from: offset,
+      to: offset + raw.length,
+      scope: meta.scope,
+      name: meta.name,
+      fullPath: meta.fullPath,
+      mode: meta.mode,
+      propertyPath: meta.propertyPath,
+    }
     return `:${placeholderKey}`
   })
 
