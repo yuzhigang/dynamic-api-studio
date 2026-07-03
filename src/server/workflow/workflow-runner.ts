@@ -80,5 +80,6 @@ function inferResultType(value: unknown): string {
 
 function inferOutputVariableType(localVariables: ApiLocalVariable[], outputVariable: string): string {
   const declared = localVariables.find((v) => v.name === outputVariable)
+  // 当输出变量未在 localVariables 中声明类型时，默认按 SQL 查询步骤的惯例使用 array。
   return declared?.type ?? 'array'
 }

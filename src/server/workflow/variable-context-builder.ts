@@ -1,4 +1,4 @@
-import { createVariableContext, type VariableContext, type VariableScope } from '@/server/analyzer/types'
+import { createVariableContext, type VariableContext } from '@/server/analyzer/types'
 import { evalExpressionFromContext } from '@/server/expression/expression-evaluator'
 import { buildDependencyGraph, topologicalSort } from '@/server/expression/dependency-graph'
 import type { ApiLocalVariable } from '@/shared/schemas/api-definition.schema'
@@ -77,14 +77,4 @@ export function getTypeDefaultValue(type: string): unknown {
     default:
       return undefined
   }
-}
-
-export function injectValueIntoContext(
-  context: VariableContext,
-  scope: VariableScope,
-  name: string,
-  value: unknown,
-  type: string,
-): void {
-  context.set(scope, name, { value, type })
 }

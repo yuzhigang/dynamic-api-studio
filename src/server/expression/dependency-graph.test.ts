@@ -27,15 +27,14 @@ describe('buildDependencyGraph', () => {
     expect(graph.edges.get('b')).toContain('a')
   })
 
-  it('does not create false dependency from $input.name pattern', () => {
+  it('handles variable names containing regex metacharacters', () => {
     const variables = [
-      { name: 'pageSize', expression: '$input.pageSize' },
-      { name: 'other', expression: '$input.other + $pageSizeLonger' },
+      { name: 'a+b', expression: '$input.a + $input.b' },
+      { name: 'a', expression: '$a + 1' },
     ]
-    const graph = buildDependencyGraph(variables)
 
-    expect(graph.edges.get('pageSize')).toEqual(new Set())
-    expect(graph.edges.get('other')).toEqual(new Set())
+    expect(() => buildDependencyGraph(variables)).not.toThrow()
+    expect(buildDependencyGraph(variables).edges.get('a+b')).toEqual(new Set())
   })
 })
 

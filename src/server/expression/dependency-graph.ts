@@ -24,7 +24,8 @@ export function buildDependencyGraph(variables: LocalVariableNode[]): Dependency
     if (!variable.expression) continue
     for (const other of variables) {
       if (other.name === variable.name) continue
-      const pattern = new RegExp(`(?<![.\\w])\\$${other.name}\\b`)
+      const escaped = other.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const pattern = new RegExp(`(?<![.\\w])\\$${escaped}\\b`)
       if (pattern.test(variable.expression)) {
         edges.get(variable.name)!.add(other.name)
       }
