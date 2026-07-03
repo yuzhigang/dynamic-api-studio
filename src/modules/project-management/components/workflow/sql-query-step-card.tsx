@@ -38,9 +38,9 @@ export function SqlQueryStepCard({ step }: SqlQueryStepCardProps) {
         />
         <span className="font-medium">变量名称</span>
         <ResultVariableInput
-          value={step.resultVariable}
+          value={step.outputVariable}
           onChange={(value) =>
-            dispatch(apiDesignerActions.updateWorkflowStep(step.id, { resultVariable: value }))
+            dispatch(apiDesignerActions.updateWorkflowStep(step.id, { outputVariable: value }))
           }
         />
       </div>

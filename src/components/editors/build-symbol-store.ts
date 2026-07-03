@@ -30,7 +30,7 @@ export function buildSymbolStore(
       source: 'input' as const,
     })),
     ...visibleSteps.map((step) => ({
-      label: `$${step.resultVariable}`,
+      label: `$${step.outputVariable}`,
       detail: `${step.title} · 上游步骤结果`,
       source: 'step' as const,
     })),

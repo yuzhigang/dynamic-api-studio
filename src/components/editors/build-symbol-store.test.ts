@@ -11,10 +11,12 @@ const baseApi = {
   tags: [],
   permissions: [],
   bodyContentType: 'json' as const,
+  description: '',
   requestParams: [
     { id: 'p1', name: 'status', location: 'query' as const, type: 'string' as const, required: true },
   ],
   responseSchema: [],
+  localVariables: [],
   workflowSteps: [],
 }
 
