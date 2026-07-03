@@ -9,6 +9,7 @@ const analyzeRequestSchema = z.object({
   dialect: z.enum(['postgresql', 'mysql', 'sqlserver', 'oracle']).optional(),
   inputNames: z.array(z.string()).optional(),
   globalNames: z.array(z.string()).optional(),
+  localNames: z.array(z.string()).optional(),
   defaults: z.record(z.unknown()).optional(),
 })
 

@@ -11,8 +11,10 @@ const testRequestSchema = z.object({
   params: z.record(z.unknown()),
   inputNames: z.array(z.string()).optional(),
   globalNames: z.array(z.string()).optional(),
-  defaults: z.record(z.unknown()).optional(),
+  localNames: z.array(z.string()).optional(),
+  localValues: z.record(z.unknown()).optional(),
   globalValues: z.record(z.unknown()).optional(),
+  defaults: z.record(z.unknown()).optional(),
 })
 
 const analyzer = new EnhancedSqlAnalyzer()
@@ -26,7 +28,7 @@ export const sqlTestRoute = new Hono().post(
     const result = renderFromPlan(plan, {
       input: body.params,
       global: body.globalValues ?? {},
-      local: {},
+      local: body.localValues ?? {},
     })
 
     return context.json({
