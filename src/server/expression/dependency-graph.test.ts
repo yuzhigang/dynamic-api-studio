@@ -26,6 +26,17 @@ describe('buildDependencyGraph', () => {
 
     expect(graph.edges.get('b')).toContain('a')
   })
+
+  it('does not create false dependency from $input.name pattern', () => {
+    const variables = [
+      { name: 'pageSize', expression: '$input.pageSize' },
+      { name: 'other', expression: '$input.other + $pageSizeLonger' },
+    ]
+    const graph = buildDependencyGraph(variables)
+
+    expect(graph.edges.get('pageSize')).toEqual(new Set())
+    expect(graph.edges.get('other')).toEqual(new Set())
+  })
 })
 
 describe('topologicalSort', () => {

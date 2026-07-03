@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createVariableContext } from '@/server/analyzer/types'
 import { runWorkflow, executeStep } from '@/server/workflow/workflow-runner'
 import type { ApiDefinitionDraft, WorkflowStep } from '@/shared/schemas/api-definition.schema'
 
@@ -73,6 +74,37 @@ describe('runWorkflow', () => {
     expect(context.get('local', 'orders')?.type).toBe('array')
   })
 
+  it('uses declared local variable type for skipped step default value', async () => {
+    const api = buildApi({
+      localVariables: [
+        {
+          id: 'v1',
+          name: 'orders',
+          type: 'object',
+          mode: 'required',
+          value: { kind: 'literal', literal: {} },
+        },
+      ],
+      workflowSteps: [
+        {
+          id: 's1',
+          kind: 'sql-query',
+          title: 'Conditional query',
+          outputVariable: 'orders',
+          condition: '$input.enabled',
+        },
+      ],
+    })
+    const stub = vi.fn().mockResolvedValue([{ id: 1 }])
+
+    const { context, results } = await runWorkflow(api, { enabled: false }, {}, { executeStep: stub })
+
+    expect(stub).not.toHaveBeenCalled()
+    expect(results).toEqual([{ stepId: 's1', skipped: true }])
+    expect(context.get('local', 'orders')?.value).toEqual({})
+    expect(context.get('local', 'orders')?.type).toBe('object')
+  })
+
   it('executes step when condition evaluates to true', async () => {
     const api = buildApi({
       workflowSteps: [
@@ -132,6 +164,6 @@ describe('executeStep', () => {
       outputVariable: 'orders',
     }
 
-    await expect(executeStep(step, {} as any)).rejects.toThrow('executeStep is not implemented')
+    await expect(executeStep(step, createVariableContext())).rejects.toThrow('executeStep is not implemented')
   })
 })

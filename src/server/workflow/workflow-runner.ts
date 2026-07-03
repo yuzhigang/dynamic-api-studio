@@ -1,7 +1,7 @@
 import { buildApiVariableContext, getTypeDefaultValue } from '@/server/workflow/variable-context-builder'
 import { evalExpressionFromContext } from '@/server/expression/expression-evaluator'
 import type { VariableContext } from '@/server/analyzer/types'
-import type { ApiDefinitionDraft, WorkflowStep } from '@/shared/schemas/api-definition.schema'
+import type { ApiDefinitionDraft, ApiLocalVariable, WorkflowStep } from '@/shared/schemas/api-definition.schema'
 
 export type StepResult = {
   stepId: string
@@ -43,9 +43,10 @@ export async function runWorkflow(
       : true
 
     if (!shouldRun) {
+      const outputType = inferOutputVariableType(apiDefinition.localVariables, step.outputVariable)
       context.set('local', step.outputVariable, {
-        value: getTypeDefaultValue('array'),
-        type: 'array',
+        value: getTypeDefaultValue(outputType),
+        type: outputType,
       })
       results.push({ stepId: step.id, skipped: true })
       continue
@@ -62,8 +63,11 @@ export async function runWorkflow(
   return { context, results }
 }
 
-export async function executeStep(_step: WorkflowStep, _context: VariableContext): Promise<unknown> {
-  throw new Error('executeStep is not implemented: SQL/JS step execution is handled by domain-specific executors')
+export async function executeStep(step: WorkflowStep, context: VariableContext): Promise<unknown> {
+  const variableCount = context.keys('input').length + context.keys('global').length + context.keys('local').length
+  throw new Error(
+    `executeStep is not implemented for step ${step.id} (${step.kind}, ${variableCount} variables in context): SQL/JS step execution is handled by domain-specific executors`,
+  )
 }
 
 function inferResultType(value: unknown): string {
@@ -72,4 +76,9 @@ function inferResultType(value: unknown): string {
   if (typeof value === 'boolean') return 'boolean'
   if (typeof value === 'object' && value !== null) return 'object'
   return 'string'
+}
+
+function inferOutputVariableType(localVariables: ApiLocalVariable[], outputVariable: string): string {
+  const declared = localVariables.find((v) => v.name === outputVariable)
+  return declared?.type ?? 'array'
 }
