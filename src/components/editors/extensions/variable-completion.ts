@@ -9,7 +9,7 @@ export type VariableContextSnapshot = {
   local: Array<{ name: string; type: string; source: 'design' | 'step' }>
 }
 
-function buildCompletions(snapshot: VariableContextSnapshot): Completion[] {
+export function buildCompletions(snapshot: VariableContextSnapshot): Completion[] {
   const completions: Completion[] = []
 
   for (const name of snapshot.input) {
@@ -73,12 +73,10 @@ export function variableCompletionFromSnapshot(snapshot: VariableContextSnapshot
 }
 
 function extractName(label: string, prefix: string): string {
-  return label
-    .replace(new RegExp(`^\\${prefix}`), '')
-    .replace(/[?!]$/, '')
+  return label.startsWith(prefix) ? label.slice(prefix.length) : label
 }
 
-function snapshotFromSymbols(symbols: SymbolItem[]): VariableContextSnapshot {
+export function snapshotFromSymbols(symbols: SymbolItem[]): VariableContextSnapshot {
   const input: string[] = []
   const global: string[] = []
   const local: VariableContextSnapshot['local'] = []

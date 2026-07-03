@@ -77,10 +77,18 @@ describe('buildSymbolStore', () => {
             outputVariable: 'orders',
             sql: 'SELECT * FROM orders',
           },
+          {
+            id: 's2',
+            kind: 'sql-query' as const,
+            title: '使用订单',
+            outputVariable: 'details',
+            sql: 'SELECT * FROM details',
+          },
         ],
       },
       's2',
     )
     expect(symbols.some((s) => s.label === '$orders' && s.source === 'step' && s.type === 'array')).toBe(true)
+    expect(symbols.some((s) => s.label === '$details')).toBe(false)
   })
 })
