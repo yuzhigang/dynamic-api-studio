@@ -238,7 +238,7 @@ function walkAndReplaceParams(
           continue
         }
 
-        let value = getRenderedValue(placeholderKey, plan, actualParams)
+        const value = getRenderedValue(placeholderKey, plan, actualParams)
 
         if (value === undefined) {
           throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
@@ -273,7 +273,7 @@ function walkAndReplaceParams(
             const placeholderKey = (item as Record<string, unknown>).value as string
             const info = plan.varMap[placeholderKey]
             if (info) {
-              let resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
+              const resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
 
               if (resolvedValue === undefined) {
                 throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
@@ -291,7 +291,7 @@ function walkAndReplaceParams(
           const placeholderKey = (value as Record<string, unknown>).value as string
           const info = plan.varMap[placeholderKey]
           if (info) {
-            let resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
+            const resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
 
             if (resolvedValue === undefined) {
               throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
