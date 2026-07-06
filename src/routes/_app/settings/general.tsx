@@ -1,5 +1,5 @@
-import { SettingsPlaceholder } from '@/modules/settings/components/placeholder/settings-placeholder'
+import { EditorAppearanceSettings } from '@/modules/settings/components/general/editor-appearance-settings'
 
 export function SettingsGeneralRouteComponent() {
-  return <SettingsPlaceholder title="基本设置" />
+  return <EditorAppearanceSettings />
 }

@@ -29,6 +29,7 @@ function createWorkflowStep(kind: WorkflowStep['kind']): WorkflowStep {
     id: createId('step'),
     kind,
     resultVariable: 'result',
+    multipleRows: false,
   }
 
   return kind === 'sql-query'
@@ -120,12 +121,15 @@ function insertWorkflowStep(
   step: WorkflowStep,
 ): WorkflowStep[] {
   const sourceIndex = steps.findIndex((item) => item.id === afterId)
+  let insertAt = sourceIndex === -1 ? steps.length : sourceIndex + 1
 
-  if (sourceIndex === -1) {
-    return [...steps, step]
+  // The assemble step must always remain last; never insert after it.
+  const assembleIndex = steps.findIndex((item) => item.role === 'assemble')
+  if (assembleIndex !== -1 && insertAt > assembleIndex) {
+    insertAt = assembleIndex
   }
 
-  return [...steps.slice(0, sourceIndex + 1), step, ...steps.slice(sourceIndex + 1)]
+  return [...steps.slice(0, insertAt), step, ...steps.slice(insertAt)]
 }
 
 export function apiDesignerReducer(
@@ -271,19 +275,31 @@ export function apiDesignerReducer(
         return state
       }
 
+      // A copy is always a regular step — the assemble role belongs to a single
+      // final step only.
+      const copy: WorkflowStep = {
+        ...source,
+        id: createId('step'),
+        title: `${source.title}副本`,
+      }
+      delete copy.role
+
       return {
         ...state,
         apiDefinition: {
           ...state.apiDefinition,
-          workflowSteps: insertWorkflowStep(state.apiDefinition.workflowSteps, action.id, {
-            ...source,
-            id: createId('step'),
-            title: `${source.title}副本`,
-          }),
+          workflowSteps: insertWorkflowStep(state.apiDefinition.workflowSteps, action.id, copy),
         },
       }
     }
-    case 'remove-workflow-step':
+    case 'remove-workflow-step': {
+      const target = state.apiDefinition.workflowSteps.find((step) => step.id === action.id)
+
+      // The assemble step cannot be deleted.
+      if (target?.role === 'assemble') {
+        return state
+      }
+
       return {
         ...state,
         apiDefinition: {
@@ -291,6 +307,7 @@ export function apiDesignerReducer(
           workflowSteps: state.apiDefinition.workflowSteps.filter((step) => step.id !== action.id),
         },
       }
+    }
     case 'set-test-param':
       return {
         ...state,

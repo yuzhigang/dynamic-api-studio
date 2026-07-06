@@ -1,5 +1,6 @@
-import { ProjectDetailPage } from '@/modules/project-management/pages/project-detail-page'
+import { Navigate, useParams } from '@tanstack/react-router'
 
 export function ProjectApiVariablesRouteComponent() {
-  return <ProjectDetailPage />
+  const { projectId = '' } = useParams({ strict: false }) as { projectId?: string }
+  return <Navigate to="/projects/$projectId/settings" params={{ projectId }} replace />
 }

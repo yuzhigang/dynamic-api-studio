@@ -77,14 +77,14 @@ export function EditableVariableRow({
   return (
     <TableRow>
       <VariableEditCells draft={draft} onChange={setDraft} />
-      <TableCell className="text-right">
+      <TableCell className="h-7 text-right">
         <div className="flex flex-col items-end gap-1">
           <div className="flex justify-end gap-1">
-            <Button type="button" variant="ghost" size="sm" onClick={handleSave} disabled={submitting}>
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleSave} disabled={submitting}>
               <Check className="h-4 w-4" />
               保存
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onEditEnd}>
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onEditEnd}>
               <X className="h-4 w-4" />
               取消
             </Button>

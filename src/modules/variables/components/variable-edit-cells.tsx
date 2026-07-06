@@ -25,32 +25,32 @@ export function VariableEditCells({
 }: VariableEditCellsProps) {
   return (
     <>
-      <TableCell>
+      <TableCell className="h-7">
         <Input
           aria-label="变量名"
           autoComplete="off"
           value={draft.name}
           placeholder={namePlaceholder}
-          className="h-8 font-mono text-sm"
+          className="h-7 font-mono text-sm"
           onChange={(event) => onChange({ ...draft, name: event.target.value })}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="h-7">
         <Input
           aria-label="显示名"
           autoComplete="off"
           value={draft.label}
           placeholder={labelPlaceholder}
-          className="h-8 text-sm"
+          className="h-7 text-sm"
           onChange={(event) => onChange({ ...draft, label: event.target.value })}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="h-7">
         <Select
           value={draft.kind}
           onValueChange={(value) => onChange({ ...draft, kind: value as VariableKind })}
         >
-          <SelectTrigger className="h-8" aria-label="类型">
+          <SelectTrigger className="h-7" aria-label="类型">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -59,13 +59,13 @@ export function VariableEditCells({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell>
+      <TableCell className="h-7">
         {draft.kind === 'single' ? (
           <Input
             aria-label="值"
             autoComplete="off"
             value={draft.value}
-            className="h-8 font-mono text-sm"
+            className="h-7 font-mono text-sm"
             onChange={(event) => onChange({ ...draft, value: event.target.value })}
           />
         ) : (

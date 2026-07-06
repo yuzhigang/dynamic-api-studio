@@ -1,6 +1,6 @@
-import { Link } from '@tanstack/react-router'
-import { Plus, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
+
+import { Plus, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,21 +13,21 @@ import type { ApiDefinitionSummary } from '@/shared/contracts/api-definition.con
 const pageSize = 6
 
 type ProjectApiSidebarProps = {
-  projectId: string
   apis: ApiDefinitionSummary[]
   selectedApiId?: string
   archived?: boolean
   loading?: boolean
   onSelectApi: (apiId: string) => void
+  onCreateApi?: () => void
 }
 
 export function ProjectApiSidebar({
-  projectId,
   apis,
   selectedApiId,
   archived,
   loading,
   onSelectApi,
+  onCreateApi,
 }: ProjectApiSidebarProps) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
@@ -58,11 +58,9 @@ export function ProjectApiSidebar({
             添加 API
           </Button>
         ) : (
-          <Button asChild className="w-full justify-start">
-            <Link to="/projects/$projectId/apis/create" params={{ projectId }}>
-              <Plus aria-hidden="true" className="mr-1.5 h-4 w-4" />
-              添加 API
-            </Link>
+          <Button type="button" className="w-full justify-start" onClick={onCreateApi}>
+            <Plus aria-hidden="true" className="mr-1.5 h-4 w-4" />
+            添加 API
           </Button>
         )}
         <div className="relative">

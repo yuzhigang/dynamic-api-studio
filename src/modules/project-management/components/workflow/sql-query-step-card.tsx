@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { CodeEditorShell } from '@/components/editors/code-editor-shell'
 import { JavascriptEditor } from '@/components/editors/javascript-editor'
 import { SqlEditor } from '@/components/editors/sql-editor'
@@ -30,7 +31,7 @@ export function SqlQueryStepCard({ step }: SqlQueryStepCardProps) {
 
   return (
     <>
-      <div className="grid grid-cols-[86px_150px_72px_150px] items-center gap-3 text-xs text-slate-700">
+      <div className="grid grid-cols-[auto_1fr_auto_1fr_auto] items-center gap-3 text-xs text-slate-700">
         <span className="font-medium">数据源</span>
         <StepDatasourceSelect
           value={step.datasourceId}
@@ -43,6 +44,16 @@ export function SqlQueryStepCard({ step }: SqlQueryStepCardProps) {
             dispatch(apiDesignerActions.updateWorkflowStep(step.id, { resultVariable: value }))
           }
         />
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${step.id}-multiple-rows`}
+            checked={step.multipleRows}
+            onCheckedChange={(checked) =>
+              dispatch(apiDesignerActions.updateWorkflowStep(step.id, { multipleRows: checked === true }))
+            }
+          />
+          <label htmlFor={`${step.id}-multiple-rows`} className="font-medium">多行返回值</label>
+        </div>
       </div>
       <div>
         <CodeEditorShell
@@ -87,17 +98,19 @@ export function SqlQueryStepCard({ step }: SqlQueryStepCardProps) {
       </div>
 
       <Dialog open={maximizedEditor === 'sql'} onOpenChange={() => setMaximizedEditor(null)}>
-        <DialogContent className="flex h-[80vh] max-w-5xl flex-col p-0">
+        <DialogContent className="flex h-[60vh] max-w-5xl flex-col p-0">
           <DialogHeader className="border-b px-6 py-4">
             <DialogTitle className="text-base">编辑 SQL 语句</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 px-6 pb-6">
-            <SqlEditor
-              value={step.sql ?? ''}
-              symbols={symbols}
-              autoHeight
-              onChange={(value) => dispatch(apiDesignerActions.updateWorkflowStep(step.id, { sql: value }))}
-            />
+            <CodeEditorShell flex className="h-full">
+              <SqlEditor
+                value={step.sql ?? ''}
+                symbols={symbols}
+                autoHeight
+                onChange={(value) => dispatch(apiDesignerActions.updateWorkflowStep(step.id, { sql: value }))}
+              />
+            </CodeEditorShell>
           </div>
         </DialogContent>
       </Dialog>
@@ -108,11 +121,13 @@ export function SqlQueryStepCard({ step }: SqlQueryStepCardProps) {
             <DialogTitle className="text-base">编辑转换语句（JS）</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 px-6 pb-6">
-            <JavascriptEditor
-              value={step.script ?? ''}
-              autoHeight
-              onChange={(value) => dispatch(apiDesignerActions.updateWorkflowStep(step.id, { script: value }))}
-            />
+            <CodeEditorShell flex className="h-full">
+              <JavascriptEditor
+                value={step.script ?? ''}
+                autoHeight
+                onChange={(value) => dispatch(apiDesignerActions.updateWorkflowStep(step.id, { script: value }))}
+              />
+            </CodeEditorShell>
           </div>
         </DialogContent>
       </Dialog>

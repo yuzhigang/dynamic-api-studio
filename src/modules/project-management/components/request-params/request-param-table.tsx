@@ -34,8 +34,8 @@ export function RequestParamTable({ location }: RequestParamTableProps) {
           <TableRow>
             <TableHead className="w-[22%]">参数名</TableHead>
             <TableHead className="w-[18%]">类型</TableHead>
-            <TableHead className="w-[12%]">必填</TableHead>
-            <TableHead className="w-[22%]">示例值</TableHead>
+            <TableHead className="w-[10%]">必填</TableHead>
+            <TableHead className="w-[22%]">默认值</TableHead>
             <TableHead>描述</TableHead>
             <TableHead className="w-20 text-right">操作</TableHead>
           </TableRow>

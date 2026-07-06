@@ -1,8 +1,8 @@
-import { autocompletion } from '@codemirror/autocomplete'
+import { autocompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
-import { sql } from '@codemirror/lang-sql'
+import { StandardSQL, keywordCompletionSource, sql } from '@codemirror/lang-sql'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import {
@@ -16,8 +16,9 @@ import { useEffect, useMemo, useRef } from 'react'
 
 import { cn } from '@/lib/cn'
 
-import { editorTheme } from '@/components/editors/extensions/editor-theme'
-import { variableCompletion } from '@/components/editors/extensions/variable-completion'
+import { resolveEditorAppearance, type EditorAppearance } from '@/components/editors/editor-appearance'
+import { createEditorTheme } from '@/components/editors/extensions/editor-theme'
+import { variableCompletionSource } from '@/components/editors/extensions/variable-completion'
 import { variableLinter } from '@/components/editors/extensions/variable-linter'
 import { variableTooltip } from '@/components/editors/extensions/variable-tooltip'
 import type { SymbolItem } from '@/components/editors/build-symbol-store'
@@ -31,6 +32,8 @@ type CodeMirrorEditorProps = {
   readOnly?: boolean
   /** 为 true 时编辑器高度由内容撑开（适合放在自适应布局中）。 */
   autoHeight?: boolean
+  /** 覆盖编辑器外观（字体、字号、配色）。未传则用 defaultEditorAppearance。 */
+  appearance?: Partial<EditorAppearance>
   onChange?: (value: string) => void
 }
 
@@ -45,8 +48,32 @@ function languageExtension(language: EditorLanguage): Extension {
   }
 }
 
-function sqlSymbolExtensions(symbols: SymbolItem[]): Extension {
-  return [variableCompletion(symbols), variableLinter(symbols), variableTooltip(symbols)]
+function sqlKeywordSource(): CompletionSource {
+  const base = keywordCompletionSource(StandardSQL, true)
+
+  return (context) => {
+    // Inside a $variable reference, defer to the variable completion source.
+    if (context.matchBefore(/\$[\w.?!]*/)) {
+      return null
+    }
+
+    return base(context)
+  }
+}
+
+function completionExtensions(language: EditorLanguage, symbols: SymbolItem[]): Extension {
+  if (language === 'sql') {
+    return [
+      autocompletion({
+        override: [variableCompletionSource(symbols), sqlKeywordSource()],
+      }),
+      variableLinter(symbols),
+      variableTooltip(symbols),
+    ]
+  }
+
+  // JavaScript/JSON rely on their language packages' own completion sources.
+  return autocompletion()
 }
 
 export function CodeMirrorEditor({
@@ -55,6 +82,7 @@ export function CodeMirrorEditor({
   symbols = [],
   readOnly = false,
   autoHeight = false,
+  appearance,
   onChange,
 }: CodeMirrorEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -62,13 +90,17 @@ export function CodeMirrorEditor({
   const onChangeRef = useRef(onChange)
   const symbolsRef = useRef(symbols)
   const initialDocRef = useRef(value)
+  // Appearance is captured once at construction (it is static config, not a
+  // per-keystroke prop). Changing it remounts via the parent if needed.
+  const appearanceRef = useRef(resolveEditorAppearance(appearance))
 
   const compartments = useMemo(
     () => ({
       language: new Compartment(),
       editable: new Compartment(),
       onChange: new Compartment(),
-      sqlSymbols: new Compartment(),
+      completion: new Compartment(),
+      appearance: new Compartment(),
     }),
     [],
   )
@@ -111,9 +143,8 @@ export function CodeMirrorEditor({
             },
           })
         : [],
-      autocompletion(),
       syntaxHighlighting(defaultHighlightStyle),
-      editorTheme,
+      compartments.appearance.of(createEditorTheme(appearanceRef.current)),
       compartments.language.of(languageExtension(language)),
       compartments.editable.of(EditorView.editable.of(!readOnly)),
       compartments.onChange.of(
@@ -123,7 +154,7 @@ export function CodeMirrorEditor({
           }
         }),
       ),
-      language === 'sql' ? compartments.sqlSymbols.of(sqlSymbolExtensions(symbolsRef.current)) : [],
+      compartments.completion.of(completionExtensions(language, symbolsRef.current)),
     ],
     // Compartments are stable; initial values are captured at construction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,6 +201,17 @@ export function CodeMirrorEditor({
     }
 
     view.dispatch({
+      effects: compartments.appearance.reconfigure(createEditorTheme(resolveEditorAppearance(appearance))),
+    })
+  }, [appearance, compartments])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) {
+      return
+    }
+
+    view.dispatch({
       effects: compartments.language.reconfigure(languageExtension(language)),
     })
   }, [compartments, language])
@@ -192,8 +234,8 @@ export function CodeMirrorEditor({
     }
 
     view.dispatch({
-      effects: compartments.sqlSymbols.reconfigure(
-        language === 'sql' ? sqlSymbolExtensions(symbolsRef.current) : [],
+      effects: compartments.completion.reconfigure(
+        completionExtensions(language, symbolsRef.current),
       ),
     })
   }, [compartments, language, symbols])

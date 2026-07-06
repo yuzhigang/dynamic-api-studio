@@ -50,10 +50,6 @@ function getBreadcrumbItems(pathname: string, context: BreadcrumbContext): React
       return [projectLink, '编辑 API']
     }
 
-    if (pathname.includes('/apis/create')) {
-      return [projectLink, '创建 API']
-    }
-
     if (context.projectId && pathname.endsWith('/settings')) {
       return [
         projectLink,

@@ -1,34 +1,57 @@
-import { Loader2, Save, Send } from 'lucide-react'
 import { useState } from 'react'
+
+import { Loader2, Save, Send } from 'lucide-react'
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { useSaveApiDefinition } from '@/modules/project-management/hooks/use-save-api-definition'
 import { useApiDesigner } from '@/modules/project-management/hooks/use-api-designer'
+import { useSaveApiDefinition } from '@/modules/project-management/hooks/use-save-api-definition'
+import { clearApiDraft } from '@/modules/project-management/utils/api-draft-storage'
+import { apiDesignerActions } from '@/modules/project-management/state/api-designer-actions'
 
 type ApiDesignerToolbarProps = {
   disabled?: boolean
 }
 
+const isDraftApiId = (id?: string) => Boolean(id && id.startsWith('draft_'))
+
 export function ApiDesignerToolbar({ disabled = false }: ApiDesignerToolbarProps) {
-  const { state } = useApiDesigner()
+  const { state, dispatch } = useApiDesigner()
   const saveMutation = useSaveApiDefinition()
+  const navigate = useNavigate()
+  const { projectId = '' } = useParams({ strict: false }) as { projectId?: string }
   const [pendingAction, setPendingAction] = useState<'draft' | 'published' | null>(null)
 
   const save = (status: 'draft' | 'published') => {
     setPendingAction(status)
-    saveMutation.mutate(
-      { ...state.apiDefinition, status },
-      {
-        onSuccess: () => toast.success(status === 'draft' ? '草稿已保存' : 'API 已发布'),
-        onError: (error) => {
-          toast.error(status === 'draft' ? '保存草稿失败' : '发布失败', {
-            description: error instanceof Error ? error.message : '请稍后重试。',
+
+    const isDraft = isDraftApiId(state.apiDefinition.id)
+    const apiToSave = isDraft
+      ? { ...state.apiDefinition, id: undefined, status }
+      : { ...state.apiDefinition, status }
+
+    saveMutation.mutate(apiToSave, {
+      onSuccess: (result) => {
+        toast.success(status === 'draft' ? '草稿已保存' : 'API 已发布')
+
+        if (isDraft && result.id) {
+          clearApiDraft(projectId)
+          dispatch(apiDesignerActions.updateApiField('id', result.id))
+          navigate({
+            to: '/projects/$projectId/apis/$apiId',
+            params: { projectId, apiId: result.id },
+            replace: true,
           })
-        },
-        onSettled: () => setPendingAction(null),
+        }
       },
-    )
+      onError: (error) => {
+        toast.error(status === 'draft' ? '保存草稿失败' : '发布失败', {
+          description: error instanceof Error ? error.message : '请稍后重试。',
+        })
+      },
+      onSettled: () => setPendingAction(null),
+    })
   }
 
   return (

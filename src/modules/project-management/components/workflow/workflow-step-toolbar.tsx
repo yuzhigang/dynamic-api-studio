@@ -1,4 +1,4 @@
-import { Braces, Copy, Database, PlusCircle, Trash2 } from 'lucide-react'
+import { Copy, PlusCircle, Trash2 } from 'lucide-react'
 
 import {
   AlertDialog,
@@ -12,12 +12,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useApiDesigner } from '@/modules/project-management/hooks/use-api-designer'
 import { apiDesignerActions } from '@/modules/project-management/state/api-designer-actions'
@@ -25,31 +19,30 @@ import { apiDesignerActions } from '@/modules/project-management/state/api-desig
 type WorkflowStepToolbarProps = {
   stepId: string
   stepTitle: string
+  isAssemble?: boolean
 }
 
-export function WorkflowStepToolbar({ stepId, stepTitle }: WorkflowStepToolbarProps) {
+export function WorkflowStepToolbar({ stepId, stepTitle, isAssemble }: WorkflowStepToolbarProps) {
   const { dispatch } = useApiDesigner()
+
+  // The assemble step is fixed as the final step and cannot be deleted, copied,
+  // or have a step inserted after it.
+  if (isAssemble) {
+    return null
+  }
 
   return (
     <div className="flex items-center gap-1">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-primary">
-            <PlusCircle aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
-            添加下一步
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => dispatch(apiDesignerActions.addWorkflowStep(stepId, 'sql-query'))}>
-            <Database aria-hidden="true" className="mr-2 h-4 w-4" />
-            SQL 查询
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => dispatch(apiDesignerActions.addWorkflowStep(stepId, 'js-transform'))}>
-            <Braces aria-hidden="true" className="mr-2 h-4 w-4" />
-            JavaScript 转换
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-primary"
+        onClick={() => dispatch(apiDesignerActions.addWorkflowStep(stepId, 'sql-query'))}
+      >
+        <PlusCircle aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
+        添加下一步
+      </Button>
 
       <Tooltip>
         <TooltipTrigger asChild>

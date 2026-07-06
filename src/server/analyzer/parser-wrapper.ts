@@ -1,9 +1,9 @@
-import { Parser } from 'node-sql-parser'
+import NodeSqlParser from 'node-sql-parser'
 import type { AST } from 'node-sql-parser'
 
 import type { SqlDialect } from '@/server/analyzer/types'
 
-const parser = new Parser()
+const parser = new NodeSqlParser.Parser()
 
 const dialectMap: Record<SqlDialect, string> = {
   postgresql: 'PostgreSQL',

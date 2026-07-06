@@ -8,6 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { AppPage } from '@/layouts/app-shell/app-page'
 import { useApiDefinitionListQuery } from '@/modules/project-management/hooks/use-api-definition-query'
 import { ProjectApiSidebar } from '@/modules/project-management/components/project-workspace/project-api-sidebar'
+import { ProjectApiVariablesTab } from '@/modules/project-management/components/project-workspace/project-api-variables-tab'
 import { ProjectSettingsForm } from '@/modules/project-management/components/project-form/project-settings-form'
 import { useProjectQuery } from '@/modules/project-management/hooks/use-project-query'
 
@@ -44,7 +45,6 @@ export function ProjectSettingsPage() {
             >
               <ResizablePanel id="sidebar" className="min-w-0" defaultSize="24%" minSize="16%" maxSize="42%">
                 <ProjectApiSidebar
-                  projectId={project.id}
                   apis={apis}
                   archived={project.status === 'archived'}
                   loading={apiListQuery.isLoading}
@@ -59,7 +59,7 @@ export function ProjectSettingsPage() {
               <ResizableHandle withHandle />
               <ResizablePanel id="content" className="min-w-0">
                 <div className="h-full overflow-auto p-5">
-                  <div className="max-w-2xl space-y-4">
+                  <div className="max-w-4xl space-y-6">
                     <Card className="bg-white">
                       <CardHeader className="flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-base">项目设置</CardTitle>
@@ -69,6 +69,15 @@ export function ProjectSettingsPage() {
                       </CardHeader>
                       <CardContent>
                         <ProjectSettingsForm key={project.id} project={project} />
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white">
+                      <CardHeader>
+                        <CardTitle className="text-base">变量设置</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ProjectApiVariablesTab projectId={project.id} />
                       </CardContent>
                     </Card>
                   </div>

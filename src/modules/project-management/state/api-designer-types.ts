@@ -17,7 +17,7 @@ export type ApiDesignerAction =
       type: 'update-api-field'
       field: keyof Pick<
         ApiDefinitionDraft,
-        'name' | 'path' | 'method' | 'description' | 'bodyContentType'
+        'id' | 'name' | 'path' | 'method' | 'description' | 'bodyContentType' | 'status'
       >
       value: string
     }

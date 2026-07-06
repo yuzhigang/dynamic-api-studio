@@ -4,6 +4,11 @@ import { useState, type PropsWithChildren, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/cn'
+import { EditorAppearanceSettingsButton } from '@/components/editors/editor-appearance-settings-button'
+
+/** 约三行代码的最小高度（含编辑器上下内边距），匹配 defaultEditorAppearance
+ * 的 14px 字号 / 1.6 行高，单位 px。 */
+const THREE_LINE_MIN_HEIGHT = 88
 
 type CodeEditorShellProps = PropsWithChildren<{
   title?: ReactNode
@@ -12,7 +17,10 @@ type CodeEditorShellProps = PropsWithChildren<{
    * 固定高度（像素）。如果未提供，编辑器将自适应内容高度。
    */
   height?: number
-  /** 最小高度，仅在不使用固定 height 时生效。 */
+  /**
+   * 最小高度，仅在不使用固定 height 时生效。默认保持约三行的最低高度；
+   * 传 0 可关闭该最小高度。
+   */
   minHeight?: number
   /** 最大高度，仅在不使用固定 height 时生效。 */
   maxHeight?: number
@@ -23,6 +31,8 @@ type CodeEditorShellProps = PropsWithChildren<{
   expanded?: boolean
   onExpandedChange?: (expanded: boolean) => void
   onMaximize?: () => void
+  /** 是否在标题栏显示编辑器风格设置按钮。默认 true。 */
+  showAppearanceSettings?: boolean
 }>
 
 export function CodeEditorShell({
@@ -38,6 +48,7 @@ export function CodeEditorShell({
   expanded: controlledExpanded,
   onExpandedChange,
   onMaximize,
+  showAppearanceSettings = true,
 }: CodeEditorShellProps) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
   const isExpanded = controlledExpanded ?? internalExpanded
@@ -50,10 +61,15 @@ export function CodeEditorShell({
 
   const showHeader = Boolean(title || collapsible || onMaximize)
 
+  // Keep at least three lines visible unless the caller fixes the height,
+  // wants the editor to fill flex space, or explicitly opts out (minHeight={0}).
+  const effectiveMinHeight = minHeight ?? (flex ? undefined : THREE_LINE_MIN_HEIGHT)
+
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-md border border-slate-200 bg-white',
+        'code-editor-shell overflow-hidden rounded-md border border-slate-200 bg-white transition-colors',
+        'focus-within:border-ring focus-within:ring-1 focus-within:ring-ring',
         flex && 'flex min-h-0 flex-1 flex-col',
         className,
       )}
@@ -73,6 +89,7 @@ export function CodeEditorShell({
             <span className="min-w-0 flex-1 truncate">{title}</span>
           )}
           <div className="flex shrink-0 items-center">
+            {showAppearanceSettings ? <EditorAppearanceSettingsButton /> : null}
             {onMaximize ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -121,7 +138,7 @@ export function CodeEditorShell({
             height != null
               ? { height }
               : {
-                  ...(minHeight != null ? { minHeight } : {}),
+                  ...(effectiveMinHeight != null ? { minHeight: effectiveMinHeight } : {}),
                   ...(maxHeight != null ? { maxHeight } : {}),
                 }
           }

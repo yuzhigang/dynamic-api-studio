@@ -1,22 +1,27 @@
+/*
+ * Structural and interaction-only rules. Appearance (font-family, font-size,
+ * line-height, colors, gutters) lives in editor-theme.ts / editor-appearance.ts
+ * so there is a single configurable source of truth.
+ */
 .cm-editor {
   height: 100%;
   min-height: 100%;
-  font-family:
-    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 12px;
 }
 
 .cm-scroller {
   overflow: auto;
 }
 
-.cm-gutters {
-  border-right: 1px solid hsl(var(--border));
-  background: #f8fafc;
-  color: #64748b;
-}
-
 .cm-editor.cm-focused {
   outline: 2px solid hsl(var(--ring));
   outline-offset: -2px;
+}
+
+/*
+ * Inside a CodeEditorShell the focus indicator is rendered on the shell's own
+ * rounded border (focus-within ring). Suppress the editor's inset outline there
+ * so the two don't stack into a doubled, square-cornered border.
+ */
+.code-editor-shell .cm-editor.cm-focused {
+  outline: none;
 }

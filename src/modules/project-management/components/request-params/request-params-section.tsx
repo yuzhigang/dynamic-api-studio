@@ -8,7 +8,7 @@ export function RequestParamsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>参数定义</CardTitle>
+        <CardTitle>请求参数定义</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="body">

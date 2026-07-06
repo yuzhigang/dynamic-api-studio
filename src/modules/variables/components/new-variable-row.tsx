@@ -43,12 +43,13 @@ export function NewVariableRow({ onSave }: NewVariableRowProps) {
         namePlaceholder="新变量名…"
         labelPlaceholder="新显示名…"
       />
-      <TableCell className="text-right">
+      <TableCell className="h-7 text-right">
         <div className="flex flex-col items-end gap-1">
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="h-7 px-2 text-xs"
             onClick={handleSave}
             disabled={!canSave || submitting}
           >

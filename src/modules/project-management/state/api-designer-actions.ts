@@ -9,7 +9,10 @@ import type {
 
 export const apiDesignerActions = {
   updateApiField(
-    field: keyof Pick<ApiDefinitionDraft, 'name' | 'path' | 'method' | 'description' | 'bodyContentType'>,
+    field: keyof Pick<
+      ApiDefinitionDraft,
+      'id' | 'name' | 'path' | 'method' | 'description' | 'bodyContentType' | 'status'
+    >,
     value: string,
   ): ApiDesignerAction {
     return { type: 'update-api-field', field, value }

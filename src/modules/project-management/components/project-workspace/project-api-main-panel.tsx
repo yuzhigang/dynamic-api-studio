@@ -1,6 +1,6 @@
-import { Link } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+
 import { FilePlus2, Play } from 'lucide-react'
-import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,53 +9,83 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiDesignerToolbar } from '@/modules/project-management/components/designer/api-designer-toolbar'
 import { LeftDesignPanel } from '@/modules/project-management/components/designer/left-design-panel'
 import { WorkflowPanel } from '@/modules/project-management/components/designer/workflow-panel'
-import { ApiDesignerProvider } from '@/modules/project-management/state/api-designer-context'
-import { getNextTestName, toTestId } from '@/modules/project-management/components/project-workspace/history-utils'
 import { ProjectApiInvocationLogTab } from '@/modules/project-management/components/project-workspace/project-api-invocation-log-tab'
 import { ProjectApiNewTestDialog } from '@/modules/project-management/components/project-workspace/project-api-new-test-dialog'
 import { ProjectApiTestHistoryTab } from '@/modules/project-management/components/project-workspace/project-api-test-history-tab'
-import { ProjectApiVariablesTab } from '@/modules/project-management/components/project-workspace/project-api-variables-tab'
+import { getNextTestName, toTestId } from '@/modules/project-management/components/project-workspace/history-utils'
+import { useApiDesigner } from '@/modules/project-management/hooks/use-api-designer'
+import { ApiDesignerProvider } from '@/modules/project-management/state/api-designer-context'
 import type {
   ApiDefinitionDraft,
   ApiDefinitionSummary,
 } from '@/shared/contracts/api-definition.contract'
 import type { Project } from '@/shared/contracts/project.contract'
 
-export type ProjectApiWorkspaceTab = 'basic' | 'variables' | 'history' | 'invocations'
+export type ProjectApiWorkspaceTab = 'basic' | 'history' | 'invocations'
 
 type ProjectApiMainPanelProps = {
   project: Project
   selectedApi?: ApiDefinitionSummary
   apiDefinition?: ApiDefinitionDraft
+  draftDefinition?: ApiDefinitionDraft
   loading?: boolean
   activeTab?: ProjectApiWorkspaceTab
   testId?: string
   onTabChange?: (tab: ProjectApiWorkspaceTab) => void
   onOpenTest?: (testId: string) => void
   onShowTestList?: () => void
+  onCreateApi?: () => void
+  onApiDefinitionChange?: (definition: ApiDefinitionDraft) => void
+}
+
+function ApiDefinitionChangeTracker({
+  onChange,
+}: {
+  onChange?: (definition: ApiDefinitionDraft) => void
+}) {
+  const { state } = useApiDesigner()
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  })
+
+  // Notify the parent only when the definition itself changes. Depending on
+  // `onChange` here would re-fire every render (the parent recreates it each
+  // time), causing an infinite setState loop.
+  useEffect(() => {
+    onChangeRef.current?.(state.apiDefinition)
+  }, [state.apiDefinition])
+
+  return null
 }
 
 export function ProjectApiMainPanel({
   project,
   selectedApi,
   apiDefinition,
+  draftDefinition,
   loading,
   activeTab = 'basic',
   testId,
   onTabChange,
   onOpenTest,
   onShowTestList,
+  onCreateApi,
+  onApiDefinitionChange,
 }: ProjectApiMainPanelProps) {
   const archived = project.status === 'archived'
   const [newTestOpen, setNewTestOpen] = useState(false)
+  const effectiveDefinition = draftDefinition ?? apiDefinition
 
   return (
     <section className="flex h-full w-full min-w-0 flex-col bg-white">
-      {selectedApi && apiDefinition ? (
+      {selectedApi && effectiveDefinition ? (
         <ApiDesignerProvider
-          key={apiDefinition.id ?? selectedApi.id}
-          initialApiDefinition={apiDefinition}
+          key={effectiveDefinition.id ?? selectedApi.id}
+          initialApiDefinition={effectiveDefinition}
         >
+          <ApiDefinitionChangeTracker onChange={onApiDefinitionChange} />
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as ProjectApiWorkspaceTab)}
@@ -68,12 +98,6 @@ export function ProjectApiMainPanel({
                   className="h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
                 >
                   基本信息
-                </TabsTrigger>
-                <TabsTrigger
-                  value="variables"
-                  className="h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                >
-                  变量设置
                 </TabsTrigger>
                 <TabsTrigger
                   value="history"
@@ -138,20 +162,16 @@ export function ProjectApiMainPanel({
               ) : null}
             </TabsContent>
 
-            <TabsContent value="variables" className="m-0 min-h-0 flex-1 overflow-auto bg-slate-50 p-5">
-              <ProjectApiVariablesTab projectId={project.id} />
-            </TabsContent>
-
             <TabsContent value="history" className="m-0 min-h-0 flex-1 overflow-auto bg-slate-50 p-5">
               <ProjectApiTestHistoryTab
-                apiDefinition={apiDefinition}
+                apiDefinition={effectiveDefinition}
                 selectedTestId={testId}
                 onSelectTest={(nextTestId) => onOpenTest?.(nextTestId)}
               />
             </TabsContent>
 
             <TabsContent value="invocations" className="m-0 min-h-0 flex-1 overflow-auto bg-slate-50 p-5">
-              <ProjectApiInvocationLogTab apiDefinition={apiDefinition} />
+              <ProjectApiInvocationLogTab apiDefinition={effectiveDefinition} />
             </TabsContent>
           </Tabs>
           <ProjectApiNewTestDialog
@@ -183,10 +203,8 @@ export function ProjectApiMainPanel({
               {archived ? (
                 <Button disabled>项目已归档</Button>
               ) : (
-                <Button asChild>
-                  <Link to="/projects/$projectId/apis/create" params={{ projectId: project.id }}>
-                    添加 API
-                  </Link>
+                <Button type="button" onClick={onCreateApi}>
+                  添加 API
                 </Button>
               )}
             </CardContent>
