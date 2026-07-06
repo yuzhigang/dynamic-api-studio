@@ -28,7 +28,7 @@ function createWorkflowStep(kind: WorkflowStep['kind']): WorkflowStep {
   const commonFields = {
     id: createId('step'),
     kind,
-    resultVariable: 'result',
+    outputVariable: 'result',
     multipleRows: false,
   }
 

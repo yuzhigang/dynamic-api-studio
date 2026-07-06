@@ -6,7 +6,8 @@ import { locateVariablesInAst } from '@/server/analyzer/ast-variable-locator'
 import { buildOptionalConditionIndex } from '@/server/analyzer/condition-cutter'
 import { validateVariableReferences } from '@/server/analyzer/validator'
 import { resolveTableAliases } from '@/server/analyzer/alias-resolver'
-import type { AnalyzeInput, CompiledSqlPlan, VariableRef } from '@/server/analyzer/types'
+import type { AnalyzeInput, CompiledSqlPlan, VariableReference } from '@/server/analyzer/types'
+import { createVariableContext } from '@/server/analyzer/types'
 
 export class EnhancedSqlAnalyzer {
   analyze(input: AnalyzeInput): CompiledSqlPlan {
@@ -32,7 +33,7 @@ export class EnhancedSqlAnalyzer {
     }
 
     // Match extracted refs to AST locations via placeholder key
-    const variableRefs: VariableRef[] = extracted.map((ref) => {
+    const variableRefs: VariableReference[] = extracted.map((ref) => {
       const placeholderKey = positionToPlaceholder.get(ref.from)
       const astPath = placeholderKey ? pathByPlaceholder.get(placeholderKey) ?? [] : []
       return { ...ref, astPath }
@@ -40,19 +41,32 @@ export class EnhancedSqlAnalyzer {
 
     const optionalConditions = buildOptionalConditionIndex(ast, preprocessVarMap)
 
-    const diagnostics = validateVariableReferences(variableRefs, {
-      inputNames: input.inputNames ?? [],
-      globalNames: input.globalNames ?? [],
-      defaults: input.defaults ?? {},
-    })
+    const context = createVariableContext()
+    for (const name of input.inputNames ?? []) {
+      context.set('input', name, {
+        value: undefined,
+        type: 'string',
+        defaultValue: input.defaults?.[name],
+      })
+    }
+    for (const name of input.globalNames ?? []) {
+      context.set('global', name, { value: undefined, type: 'string' })
+    }
+    for (const name of input.localNames ?? []) {
+      context.set('local', name, { value: undefined, type: 'string' })
+    }
+
+    const diagnostics = validateVariableReferences(variableRefs, context)
 
     const varMap: CompiledSqlPlan['varMap'] = {}
     for (const [key, value] of Object.entries(preprocessVarMap)) {
       varMap[key] = {
-        namespace: value.namespace,
+        scope: value.scope,
         name: value.name,
         dataType: 'string', // TODO: infer from JSON Schema
+        mode: value.mode,
         defaultValue: input.defaults?.[value.name],
+        propertyPath: value.propertyPath,
       }
     }
 
@@ -62,6 +76,7 @@ export class EnhancedSqlAnalyzer {
         .update(JSON.stringify({
           inputNames: input.inputNames ?? [],
           globalNames: input.globalNames ?? [],
+          localNames: input.localNames ?? [],
           defaults: input.defaults ?? {},
         }))
         .digest('hex'),
@@ -79,12 +94,18 @@ export class EnhancedSqlAnalyzer {
 }
 
 export { extractVariablesFromSql, preprocessSql } from '@/server/analyzer/variable-extractor'
+export {
+  createVariableContext,
+  VARIABLE_SCOPES,
+} from '@/server/analyzer/types'
 export type {
   SqlDialect,
-  VariableSource,
   VariableMode,
   SqlKind,
-  VariableRef,
+  VariableReference,
+  VariableScope,
+  VariableValue,
+  VariableContext,
   OptionalConditionIndex,
   StaticDiagnostic,
   StepReference,

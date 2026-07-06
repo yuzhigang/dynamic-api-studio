@@ -39,12 +39,28 @@ export const schemaFieldSchema: z.ZodType<SchemaField> = z.lazy(() =>
 
 export const workflowStepKindSchema = z.enum(['sql-query', 'js-transform'])
 
+export const apiLocalVariableSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  type: scalarTypeSchema,
+  itemType: z.string().optional(),
+  mode: z.enum(['required', 'optional', 'defaulted']),
+  defaultValue: z.unknown().optional(),
+  value: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('literal'), literal: z.unknown() }),
+    z.object({ kind: z.literal('expression'), expression: z.string().min(1) }),
+  ]),
+})
+
+export type ApiLocalVariable = z.infer<typeof apiLocalVariableSchema>
+
 export const workflowStepSchema = z.object({
   id: z.string(),
   kind: workflowStepKindSchema,
   title: z.string().min(1),
   datasourceId: z.string().optional(),
-  resultVariable: z.string().min(1),
+  outputVariable: z.string().min(1),
+  condition: z.string().optional(),
   sql: z.string().optional(),
   script: z.string().optional(),
 })
@@ -64,6 +80,7 @@ export const apiDefinitionDraftSchema = z.object({
   bodyContentType: z.enum(['x-www-form-urlencoded', 'json', 'form-data']),
   requestParams: z.array(requestParamSchema),
   responseSchema: z.array(schemaFieldSchema),
+  localVariables: z.array(apiLocalVariableSchema).default([]),
   workflowSteps: z.array(workflowStepSchema),
 })
 

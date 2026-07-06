@@ -1,20 +1,20 @@
-import type { CompiledSqlPlan, RenderResult } from '@/server/analyzer/types'
+import type { CompiledSqlPlan, RenderResult, VariableInfo } from '@/server/analyzer/types'
 import { stringifyAst } from '@/server/analyzer/parser-wrapper'
 
 export function renderFromPlan(
   plan: CompiledSqlPlan,
-  actualParams: { input: Record<string, unknown>; global: Record<string, unknown> }
+  actualParams: { input: Record<string, unknown>; global: Record<string, unknown>; local: Record<string, unknown> },
 ): RenderResult {
   // 1. Clone the AST
   const trimmedAst = structuredClone(plan.ast as object) as Record<string, unknown>
 
   // 2. Remove optional conditions
   for (const condition of plan.optionalConditions) {
-    const value = resolveVariableValue(condition.variablePath, plan, actualParams)
+    const value = getRenderedValue(condition.variablePath, plan, actualParams)
 
     if (condition.conditionType === 'between-expr') {
       const siblingValue = condition.siblingVariablePath
-        ? resolveVariableValue(condition.siblingVariablePath, plan, actualParams)
+        ? getRenderedValue(condition.siblingVariablePath, plan, actualParams)
         : undefined
       if (isEmpty(value) || isEmpty(siblingValue)) {
         removeNodeAtPath(trimmedAst, condition.astPath)
@@ -43,12 +43,56 @@ export function renderFromPlan(
 function resolveVariableValue(
   placeholderKey: string,
   plan: CompiledSqlPlan,
-  actualParams: { input: Record<string, unknown>; global: Record<string, unknown> }
+  actualParams: { input: Record<string, unknown>; global: Record<string, unknown>; local: Record<string, unknown> },
 ): unknown {
   const info = plan.varMap[placeholderKey]
   if (!info) return undefined
-  if (info.namespace === 'input') return actualParams.input[info.name]
-  return actualParams.global[info.name]
+
+  let value = actualParams[info.scope]?.[info.name]
+
+  // 数组属性访问：$orders[].id
+  if (info.propertyPath && Array.isArray(value)) {
+    value = value.map((item) => getProperty(item, info.propertyPath!))
+  }
+
+  return value
+}
+
+function getRenderedValue(
+  placeholderKey: string,
+  plan: CompiledSqlPlan,
+  actualParams: { input: Record<string, unknown>; global: Record<string, unknown>; local: Record<string, unknown> },
+): unknown {
+  const info = plan.varMap[placeholderKey]
+  if (!info) return undefined
+
+  const value = resolveVariableValue(placeholderKey, plan, actualParams)
+
+  if (isEmpty(value)) {
+    if (info.mode === 'optional') return undefined
+    if (info.mode === 'defaulted') return info.defaultValue
+  }
+
+  return value
+}
+
+function getProperty(value: unknown, path: string[]): unknown {
+  let current: unknown = value
+  for (const key of path) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined
+    current = (current as Record<string, unknown>)[key]
+  }
+  return current
+}
+
+function buildVariableFullPath(info: VariableInfo): string {
+  if (info.scope === 'input') return `$input.${info.name}`
+  if (info.scope === 'global') return `$.${info.name}`
+  let path = `$${info.name}`
+  if (info.propertyPath) {
+    path += `[].${info.propertyPath.join('.')}`
+  }
+  return path
 }
 
 function isEmpty(value: unknown): boolean {
@@ -163,8 +207,8 @@ function isEmptyWhere(where: Record<string, unknown>): boolean {
 function walkAndReplaceParams(
   node: unknown,
   plan: CompiledSqlPlan,
-  actualParams: { input: Record<string, unknown>; global: Record<string, unknown> },
-  params: Array<{ value: unknown; type: string }>
+  actualParams: { input: Record<string, unknown>; global: Record<string, unknown>; local: Record<string, unknown> },
+  params: Array<{ value: unknown; type: string }>,
 ): boolean {
   if (node === null || node === undefined || typeof node !== 'object') return false
 
@@ -194,14 +238,10 @@ function walkAndReplaceParams(
           continue
         }
 
-        let value = resolveVariableValue(placeholderKey, plan, actualParams)
-        if (value === undefined && info.defaultValue !== undefined) {
-          value = info.defaultValue
-        }
+        const value = getRenderedValue(placeholderKey, plan, actualParams)
 
-        const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
         if (value === undefined) {
-          throw new Error(`变量 ${fullPath} 没有值`)
+          throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
         }
 
         if (Array.isArray(value)) {
@@ -233,14 +273,10 @@ function walkAndReplaceParams(
             const placeholderKey = (item as Record<string, unknown>).value as string
             const info = plan.varMap[placeholderKey]
             if (info) {
-              let resolvedValue = resolveVariableValue(placeholderKey, plan, actualParams)
-              if (resolvedValue === undefined && info.defaultValue !== undefined) {
-                resolvedValue = info.defaultValue
-              }
+              const resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
 
-              const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
               if (resolvedValue === undefined) {
-                throw new Error(`变量 ${fullPath} 没有值`)
+                throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
               }
 
               value[i] = { type: 'origin', value: '?' }
@@ -255,14 +291,10 @@ function walkAndReplaceParams(
           const placeholderKey = (value as Record<string, unknown>).value as string
           const info = plan.varMap[placeholderKey]
           if (info) {
-            let resolvedValue = resolveVariableValue(placeholderKey, plan, actualParams)
-            if (resolvedValue === undefined && info.defaultValue !== undefined) {
-              resolvedValue = info.defaultValue
-            }
+            const resolvedValue = getRenderedValue(placeholderKey, plan, actualParams)
 
-            const fullPath = info.namespace === 'input' ? `$input.${info.name}` : `$.${info.name}`
             if (resolvedValue === undefined) {
-              throw new Error(`变量 ${fullPath} 没有值`)
+              throw new Error(`变量 ${buildVariableFullPath(info)} 没有值`)
             }
 
             record[key] = { type: 'origin', value: '?' }
@@ -279,5 +311,10 @@ function walkAndReplaceParams(
 }
 
 function isParamNode(node: unknown): boolean {
-  return typeof node === 'object' && node !== null && (node as Record<string, unknown>).type === 'param' && typeof (node as Record<string, unknown>).value === 'string'
+  return (
+    typeof node === 'object' &&
+    node !== null &&
+    (node as Record<string, unknown>).type === 'param' &&
+    typeof (node as Record<string, unknown>).value === 'string'
+  )
 }

@@ -1,14 +1,8 @@
-import type { StaticDiagnostic, VariableRef } from '@/server/analyzer/types'
-
-export type ValidationContext = {
-  inputNames: string[]
-  globalNames: string[]
-  defaults?: Record<string, unknown>
-}
+import type { StaticDiagnostic, VariableContext, VariableReference } from '@/server/analyzer/types'
 
 export function validateVariableReferences(
-  variables: VariableRef[],
-  context: ValidationContext,
+  variables: VariableReference[],
+  context: VariableContext,
 ): StaticDiagnostic[] {
   const diagnostics: StaticDiagnostic[] = []
 
@@ -23,27 +17,19 @@ export function validateVariableReferences(
       continue
     }
 
-    if (variable.namespace === 'input' && !context.inputNames.includes(variable.name)) {
+    const exists = context.has(variable.scope, variable.name)
+    if (!exists) {
       diagnostics.push({
         from: variable.from,
         to: variable.to,
         severity: 'error',
-        message: `输入参数 ${variable.name} 未定义`,
+        message: buildMissingMessage(variable.scope, variable.name),
       })
       continue
     }
 
-    if (variable.namespace === 'global' && !context.globalNames.includes(variable.name)) {
-      diagnostics.push({
-        from: variable.from,
-        to: variable.to,
-        severity: 'error',
-        message: `全局/项目变量 ${variable.name} 未定义`,
-      })
-      continue
-    }
-
-    if (variable.mode === 'defaulted' && context.defaults?.[variable.name] === undefined) {
+    const value = context.get(variable.scope, variable.name)
+    if (variable.mode === 'defaulted' && value?.defaultValue === undefined) {
       diagnostics.push({
         from: variable.from,
         to: variable.to,
@@ -54,4 +40,14 @@ export function validateVariableReferences(
   }
 
   return diagnostics
+}
+
+function buildMissingMessage(scope: VariableReference['scope'], name: string): string {
+  if (scope === 'input') {
+    return `输入参数 ${name} 未定义`
+  }
+  if (scope === 'global') {
+    return `全局/项目变量 ${name} 未定义`
+  }
+  return `局部变量 ${name} 未定义`
 }

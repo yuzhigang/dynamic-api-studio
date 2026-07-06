@@ -47,6 +47,7 @@ export class ApiTestService {
     const rendered = renderFromPlan(plan, {
       input: request.params,
       global: {},
+      local: {},
     })
 
     const knex = this.knexRegistry.getOrCreate(toKnexConfig(dataSource))

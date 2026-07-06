@@ -142,13 +142,14 @@ export function createEmptyApiDefinition(overrides: Partial<ApiDefinitionDraft> 
         ],
       },
     ],
+    localVariables: [],
     workflowSteps: [
       {
         id: 'step_order_main',
         kind: 'sql-query',
         title: '查询订单主表',
         datasourceId: 'orderMainDb',
-        resultVariable: 'orderMain',
+        outputVariable: 'orderMain',
         sql: `SELECT
   om.order_id, om.order_no, om.customer_name, om.total_amount,
   om.status, om.create_time
@@ -166,7 +167,7 @@ LIMIT $(pageSize) OFFSET $((pageNo - 1) * pageSize)`,
         kind: 'sql-query',
         title: '查询订单明细',
         datasourceId: 'orderDetailDb',
-        resultVariable: 'orderItems',
+        outputVariable: 'orderItems',
         sql: `SELECT
   od.order_id, od.product_id, od.product_name, od.quantity, od.price
 FROM
@@ -178,7 +179,7 @@ WHERE od.order_id IN ($orderMain.order_id)`,
         kind: 'sql-query',
         title: '查询商品信息',
         datasourceId: 'productDb',
-        resultVariable: 'productMap',
+        outputVariable: 'productMap',
         sql: `SELECT
   p.product_id, p.product_name, p.sku, p.unit
 FROM
@@ -189,7 +190,7 @@ WHERE p.product_id IN ($orderItems.product_id)`,
         id: 'step_assemble',
         kind: 'js-transform',
         title: '结果组装（最后一步）',
-        resultVariable: 'data',
+        outputVariable: 'data',
         script: `const orderMap = new Map();
 orderMain.forEach((om) => orderMap.set(om.order_id, { ...om, items: [] }));
 
