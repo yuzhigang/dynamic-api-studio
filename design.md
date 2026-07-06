@@ -30,6 +30,18 @@ $var?    可选变量，为空时删除当前最小逻辑条件项
 $var!    默认变量，为空时使用变量定义中的默认值
 ```
 
+三种后缀语义在所有作用域上统一生效。变量按作用域分为三类，对应不同来源：
+
+```text
+$input.xxx   input 作用域   API 查询参数
+$.xxx        global 作用域  平台/项目全局变量和函数
+$xxx         local 作用域   API 内部变量（设计时变量 + 前置步骤输出）
+```
+
+`local` 作用域变量有两个来源：API 设计时定义的局部变量（可赋常量或 JS 表达式），以及前置步骤的 `outputVariable` 输出。两者共用 `$xxx` 语法，但禁止同名。
+
+数组属性访问用于 IN 子句展开，例如 `$orders[].id` 表示取 `orders` 数组每个元素的 `id`，渲染为 `IN (?, ?, ?)`。后缀可与数组属性组合：`$orders?[].id`、`$orders![]?.id`。
+
 ## 2. 设计目标
 
 本设计需要同时满足以下目标：
@@ -145,10 +157,10 @@ AliasCompletionProvider
 示例：
 
 ```sql
-AND om.tenant_id = $ctx.tenantId
+AND om.tenant_id = $.tenantId
 ```
 
-如果 `$ctx.tenantId` 没有值，平台直接报错。
+如果 `$.tenantId` 没有值，平台直接报错。
 
 适用场景：
 
@@ -624,14 +636,17 @@ Oracle    → "OM"."CREATE_TIME"  （双引号 + 默认大写）
 
 ## 8. JSON Schema 变量定义
 
-变量定义统一使用 JSON Schema。不同命名空间分别对应不同 Schema。
+变量定义统一使用 JSON Schema。三个作用域分别对应不同 Schema：
 
 ```text
-inputSchema       对应 $input
-contextSchema     对应 $ctx
-globalSchema      对应 $
-stepOutputSchema  对应上游步骤变量
+inputSchema       对应 $input.xxx     API 查询参数
+globalSchema      对应 $.xxx          平台/项目全局变量和函数
+localSchema       对应 $xxx           API 内部变量（设计时变量 + 前置步骤输出）
 ```
+
+`localSchema` 由两部分组成：API 设计时声明的局部变量（含类型、模式、默认值、常量或 JS 表达式），以及前置步骤的 `outputVariable` 输出（运行时从 SQL SELECT 列表推断）。两者共用 `local` 作用域，但禁止同名。
+
+API 设计时局部变量可互相引用，保存前做拓扑排序，循环依赖不允许保存。表达式使用轻量 JS 沙箱（`new Function` 注入 `input` / `global` / `local` 三个作用域）求值，可调用 `$.getMin` 等全局函数。
 
 ### 8.1 inputSchema 示例
 
@@ -948,7 +963,7 @@ type OptionalConditionIndex = {
 触发编译的事件：
 1. 用户保存 SQL 步骤。
 2. 用户发布 API（含 SQL 步骤）。
-3. 步骤绑定的 JSON Schema（inputSchema / contextSchema / globalSchema）变更。
+3. 步骤绑定的 JSON Schema（inputSchema / globalSchema / localSchema）变更。
 4. 步骤绑定的 dataSourceId 或 dialect 变更。
 5. 上游步骤 outputSchema 变更（影响变量可见性和字段提示）。
 
@@ -1137,7 +1152,7 @@ CompletionEngine
 
 ```text
 VariableCompletionProvider
-负责 $input、$ctx、$、$orderMain 等变量提示。
+负责 $input.xxx、$.xxx、$xxx（含 $orderMain 等步骤输出与设计时变量）等变量提示。
 
 DatabaseMetadataCompletionProvider
 负责数据源、数据库、Schema、表、视图、字段、字段类型提示。
@@ -1160,7 +1175,9 @@ type SymbolItem = {
   id: string
   label: string
   insertText: string
-  namespace: "input" | "ctx" | "global" | "step" | "database"
+  scope: "input" | "global" | "local"
+  /** local 作用域下区分设计时变量与步骤输出 */
+  source?: "design" | "step"
   variablePath?: string
   dataType?: string
   title?: string
@@ -1182,7 +1199,7 @@ type SymbolItem = {
   id: "input.customerName",
   label: "customerName",
   insertText: "$input.customerName",
-  namespace: "input",
+  scope: "input",
   variablePath: "$input.customerName",
   dataType: "string",
   title: "客户名称",
@@ -1197,11 +1214,26 @@ type SymbolItem = {
   id: "step.orderMain.order_id",
   label: "order_id",
   insertText: "$orderMain[].order_id",
-  namespace: "step",
+  scope: "local",
+  source: "step",
   variablePath: "$orderMain[].order_id",
   dataType: "string",
   title: "订单ID",
   sourceStepId: "step_order_main"
+}
+```
+
+API 设计时局部变量示例：
+
+```ts
+{
+  id: "local.offset",
+  label: "offset",
+  insertText: "$offset",
+  scope: "local",
+  source: "design",
+  variablePath: "$offset",
+  dataType: "integer"
 }
 ```
 
@@ -1210,21 +1242,22 @@ type SymbolItem = {
 当前步骤可见符号表由以下内容组成：
 
 ```text
-$input      API 输入参数
-$ctx        运行上下文变量
-$           全局变量
-$stepName   当前步骤可见的上游步骤变量
+$input.xxx   API 输入参数
+$.xxx        平台/项目全局变量和函数
+$xxx         local 作用域：API 设计时变量 + 当前步骤之前的步骤输出
 ```
 
 可见性规则：
 
 ```text
-1. 当前步骤始终可以访问 $input、$ctx、$。
-2. 当前步骤只能访问上游步骤变量。
+1. 当前步骤始终可以访问 $input、$.、API 设计时 $xxx 变量。
+2. 当前步骤只能访问上游步骤的 outputVariable 输出。
 3. 当前步骤不能访问下游步骤变量。
 4. 如果使用 DAG 编排，只能访问依赖路径中允许访问的步骤变量。
 5. 已删除、改名、Schema 无效的步骤变量不应作为有效提示项。
 6. 上游步骤输出 Schema 未确认时，可以提示变量名，但不提示字段，或标记为未确认。
+7. local 变量与步骤输出变量禁止同名，保存时校验。
+8. local 变量支持互相引用，保存前做拓扑排序，循环依赖不允许保存。
 ```
 
 ## 12. 上游变量动态变化感知
@@ -1236,9 +1269,21 @@ $stepName   当前步骤可见的上游步骤变量
 ```ts
 type WorkflowState = {
   inputSchema: JsonSchema
-  contextSchema: JsonSchema
   globalSchema: JsonSchema
+  localVariables: ApiLocalVariable[]
   steps: WorkflowStep[]
+}
+
+type ApiLocalVariable = {
+  id: string
+  name: string
+  type: "string" | "integer" | "decimal" | "boolean" | "array" | "object"
+  itemType?: string
+  mode: "required" | "optional" | "defaulted"
+  defaultValue?: unknown
+  value:
+    | { kind: "literal"; literal: unknown }
+    | { kind: "expression"; expression: string }
 }
 
 type WorkflowStep = {
@@ -1247,7 +1292,8 @@ type WorkflowStep = {
   type: "sql" | "script" | "transform"
   dataSourceId?: string
   dialect?: string
-  resultVariable?: string
+  outputVariable?: string
+  condition?: string
   sql?: string
   outputSchema?: JsonSchema
   schemaVersion: number
@@ -1364,7 +1410,7 @@ JOIN order_item oi ON oi.order_id = om.id
   "type": "sql",
   "dataSourceId": "mes_pg",
   "dialect": "postgresql",
-  "resultVariable": "orderMain",
+  "outputVariable": "orderMain",
   "sql": "SELECT * FROM order_main om WHERE om.order_no = $input.orderNo?"
 }
 ```
@@ -1509,9 +1555,9 @@ oi.
 常见上下文：
 
 ```text
-输入 $                  提示变量命名空间
+输入 $                  提示变量作用域
 输入 $input.            提示 inputSchema 字段
-输入 $ctx.              提示 contextSchema 字段
+输入 $.                 提示 globalSchema 字段
 输入 $orderMain[].      提示上游步骤输出字段
 FROM 后                 提示表、视图
 JOIN 后                 提示表、视图
@@ -1531,8 +1577,8 @@ AND om.status IN $
 提示：
 
 ```text
-$input
-$ctx
+$input.
+$.
 $orderMain
 ```
 
@@ -2060,7 +2106,7 @@ API 执行时的安全渲染复用同一 EnhancedSqlAnalyzer 实例。
 
 ```text
 根据 Workflow State 生成当前步骤可见变量
-合并 inputSchema、contextSchema、globalSchema、stepOutputSchema
+合并 inputSchema、globalSchema、localSchema（设计时变量 + 上游步骤输出）
 提供变量提示数据（→ Completion Engine）
 提供变量校验基础数据（→ EnhancedSqlAnalyzer.validate）
 感知 schemaVersion / schemaHash 变化并广播更新
@@ -2153,7 +2199,7 @@ SQL Renderer 是唯一了解数据库方言占位符格式的模块（PG → $1/
 编辑器与提示：
 5. CodeMirror 6 SQL 编辑器（@codemirror/lang-sql + autocomplete + lint）。
 6. Completion Engine + Provider 注册机制。
-7. $input、$ctx、$、$stepName 四类变量提示。
+7. $input.xxx、$.xxx、$xxx 三类作用域变量提示（local 覆盖设计时变量与步骤输出）。
 8. JSON Schema 到 SymbolItem 的转换。
 9. $var、$var?、$var! 三种变量形式及修饰符提示。
 10. LIKE %$var?% 语法提示。
@@ -2326,6 +2372,6 @@ $var!    为空时使用 JSON Schema default
 
 变量定义统一使用 JSON Schema。SQL 安全渲染需要的字段名、关键字等非参数化内容通过 `x-sql` 扩展进行白名单映射。
 
-自动提示采用 Provider 架构，既支持 `$input`、`$ctx`、上游步骤变量，也兼容未来每个数据源的数据库元数据提示，包括表、视图、字段、字段类型和别名字段提示。
+自动提示采用 Provider 架构，既支持 `$input.xxx`、`$.xxx`、`$xxx`（local 含设计时变量与上游步骤输出）三类作用域变量，也兼容未来每个数据源的数据库元数据提示，包括表、视图、字段、字段类型和别名字段提示。
 
 平台通过 Workflow State、Symbol Store、Metadata Store、Completion Engine、EnhancedSqlAnalyzer 和 SQL Renderer 的分层设计，实现 SQL 自由输入、变量动态提示、上游变化感知、数据源元数据提示、诊断标红和安全参数化执行之间的统一。
