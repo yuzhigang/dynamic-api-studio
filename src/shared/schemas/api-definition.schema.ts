@@ -61,6 +61,8 @@ export const workflowStepSchema = z.object({
   datasourceId: z.string().optional(),
   outputVariable: z.string().min(1),
   condition: z.string().optional(),
+  multipleRows: z.boolean().optional(),
+  role: z.string().optional(),
   sql: z.string().optional(),
   script: z.string().optional(),
 })

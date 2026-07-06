@@ -1,4 +1,4 @@
-import { autocompletion, type Completion, type CompletionContext } from '@codemirror/autocomplete'
+import { autocompletion, type Completion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete'
 import type { Extension } from '@codemirror/state'
 
 import type { SymbolItem } from '@/components/editors/build-symbol-store'
@@ -113,4 +113,12 @@ export function snapshotFromSymbols(symbols: SymbolItem[]): VariableContextSnaps
  */
 export function variableCompletion(symbols: SymbolItem[]): Extension {
   return variableCompletionFromSnapshot(snapshotFromSymbols(symbols))
+}
+
+/**
+ * Returns a CompletionSource for use in `autocompletion({ override: [...] })`.
+ * Kept for callers that compose their own autocompletion extension.
+ */
+export function variableCompletionSource(symbols: SymbolItem[]): CompletionSource {
+  return createCompletionSource(buildCompletions(snapshotFromSymbols(symbols)))
 }
