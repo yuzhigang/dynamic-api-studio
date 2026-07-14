@@ -91,6 +91,13 @@ export class EnhancedSqlAnalyzer {
       references: [], // TODO: extract step references
     }
   }
+
+  getStatementType(plan: CompiledSqlPlan): 'select' | 'insert' | 'update' | 'delete' | 'other' {
+    const node = Array.isArray(plan.ast) ? plan.ast[0] : plan.ast
+    const type = (node as { type?: string } | undefined)?.type
+    if (type === 'select' || type === 'insert' || type === 'update' || type === 'delete') return type
+    return 'other'
+  }
 }
 
 export { extractVariablesFromSql, preprocessSql } from '@/server/analyzer/variable-extractor'
