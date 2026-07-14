@@ -1,3 +1,4 @@
+import { extractRawValues } from '@/server/workflow/variable-binder'
 import type { VariableContext, VariableScope } from '@/server/analyzer/types'
 
 export type ExpressionContext = {
@@ -43,12 +44,4 @@ export function evalExpressionFromContext(code: string, context: VariableContext
     local: extractRawValues(context, 'local'),
   }
   return evalExpression(code, scopeValues)
-}
-
-function extractRawValues(context: VariableContext, scope: VariableScope): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const name of context.keys(scope)) {
-    result[name] = context.get(scope, name)?.value
-  }
-  return result
 }
