@@ -202,6 +202,21 @@ dynamic-api-studio/
 │   │   │   ├── validator.ts            # 变量合法性校验
 │   │   │   └── index.ts
 │   │   │
+│   │   ├── workflow/                    # 执行引擎（可复用，被试运行与发布态调用复用）
+│   │   │   ├── workflow-runner.ts       # 编排循环 + 写事务 + assemble
+│   │   │   ├── variable-context-builder.ts
+│   │   │   ├── variable-binder.ts       # 提取 {input,global,local} 原始值
+│   │   │   ├── input-validator.ts       # 按 requestParams 校验输入
+│   │   │   ├── global-variable-loader.ts
+│   │   │   ├── datasource-config.ts     # DataSource → Knex 配置 + 方言映射
+│   │   │   ├── normalize-result.ts      # knex.raw 结果归一化
+│   │   │   ├── plan-cache.ts            # CompiledSqlPlan LRU
+│   │   │   ├── transaction-manager.ts
+│   │   │   ├── sql-executor.ts
+│   │   │   ├── js-transform-executor.ts
+│   │   │   ├── result-assembler.ts
+│   │   │   └── workflow-symbols.ts
+│   │   │
 │   │   ├── domains/                # 业务领域（service/repository/mapper）
 │   │   │   ├── api-definition/
 │   │   │   ├── data-source/
@@ -210,11 +225,7 @@ dynamic-api-studio/
 │   │   │   │   ├── metadata-provider.ts       # 元数据提供者接口
 │   │   │   │   └── database-introspector.ts   # 通用查询 + dialect provider 委托
 │   │   │   ├── api-test/
-│   │   │   │   ├── api-test.service.ts
-│   │   │   │   ├── workflow-runner.ts
-│   │   │   │   ├── sql-executor.ts            # 使用 knex.raw(sql, params) 执行
-│   │   │   │   ├── variable-binder.ts
-│   │   │   │   └── result-assembler.ts
+│   │   │   │   └── api-test.service.ts
 │   │   │   ├── function/
 │   │   │   ├── scheduled-task/
 │   │   │   ├── parameter/
@@ -254,6 +265,10 @@ dynamic-api-studio/
 - **后端**：`node-sql-parser` 仅在 Node.js 运行。`server/analyzer/` 封装为 `EnhancedSqlAnalyzer`，提供 parse / trimConditions / validate / stringify / compilePlan / renderFromPlan
 - **前端**：`@codemirror/lang-sql` 的 Lezer grammar 提供本地 token 类型；正则提取 `$变量` 模式匹配驱动即时补全；通过 `POST /api/sql/analyze`（debounce 300ms）获取后端权威 AST 分析
 - **编译缓存**：步骤保存时预编译为 `CompiledSqlPlan`，API 调用时基于 Plan 轻量渲染（跳过重复 parse）。详见 design.md §9.3
+
+### 执行引擎 (Workflow Engine)
+
+执行引擎位于 `server/workflow/`，被试运行面板与（未来）发布态调度共用同一 `runWorkflow` 编排入口。
 
 ### 数据库访问：Knex
 
