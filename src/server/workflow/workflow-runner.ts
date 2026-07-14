@@ -89,6 +89,7 @@ export async function runWorkflow(
   const sqlSteps = apiDefinition.workflowSteps.filter((s) => s.kind === 'sql-query')
   const classify = options.classifyStep ?? ((step) => classifySqlStep(step, deps, symbols, planCache))
   const writeSteps = sqlSteps.filter((s) => classify(s) === 'write')
+  const writeStepIds = new Set(writeSteps.map((step) => step.id))
 
   let trx: Knex.Transaction | undefined
   if (writeSteps.length > 0) {
@@ -108,7 +109,7 @@ export async function runWorkflow(
     }
   }
 
-  const execute = options.executeStep ?? ((step, ctx, d) => dispatchStep(step, ctx, d, { symbols, planCache, trx }))
+  const execute = options.executeStep ?? ((step, ctx, d) => dispatchStep(step, ctx, d, { symbols, planCache, trx, writeStepIds }))
 
   const stepResults: StepResult[] = []
   const logs: WorkflowRunResult['logs'] = []
@@ -143,7 +144,18 @@ export async function runWorkflow(
     }
   }
 
-  if (trx) await safeCommit(trx)
+  if (trx) {
+    try {
+      await commitTrx(trx)
+    } catch (error) {
+      await safeRollback(trx)
+      const message = error instanceof Error ? error.message : String(error)
+      return {
+        status: 'failed', context, stepResults, response: undefined, logs,
+        error: { code: 'STEP_FAILED', message: `事务提交失败：${message}` },
+      }
+    }
+  }
 
   const { response, diagnostics } = assembleResponse(apiDefinition, context)
   return { status: 'success', context, stepResults, response, logs, diagnostics }
@@ -153,10 +165,14 @@ async function dispatchStep(
   step: WorkflowStep,
   context: VariableContext,
   deps: WorkflowDeps,
-  execOptions: { symbols: ReturnType<typeof buildWorkflowSymbols>; planCache: PlanCache; trx?: Knex.Transaction },
+  execOptions: { symbols: ReturnType<typeof buildWorkflowSymbols>; planCache: PlanCache; trx?: Knex.Transaction; writeStepIds: Set<string> },
 ): Promise<unknown> {
   if (step.kind === 'sql-query') {
-    return executeSql(step, context, deps, { symbols: execOptions.symbols, planCache: execOptions.planCache, trx: execOptions.trx })
+    return executeSql(step, context, deps, {
+      symbols: execOptions.symbols,
+      planCache: execOptions.planCache,
+      trx: execOptions.writeStepIds.has(step.id) ? execOptions.trx : undefined,
+    })
   }
   return executeJsTransform(step, context)
 }
@@ -205,10 +221,6 @@ function errorDetails(step: WorkflowStep, error: unknown): unknown {
   void error
   if (step.kind === 'sql-query') return { sql: step.sql, datasourceId: step.datasourceId }
   return { scriptSnippet: step.script?.slice(0, 200) }
-}
-
-async function safeCommit(trx: Knex.Transaction): Promise<void> {
-  try { await commitTrx(trx) } catch { await safeRollback(trx) }
 }
 
 async function safeRollback(trx: Knex.Transaction): Promise<void> {

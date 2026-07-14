@@ -41,4 +41,21 @@ describe('ApiTestService', () => {
     expect(result.statusCode).toBe(400)
     expect(result.response).toMatchObject({ code: 'INVALID_INPUT' })
   })
+
+  it('handles an assemble script with no return without crashing on size', async () => {
+    const apiNoReturn: ApiDefinitionDraft = {
+      ...api(),
+      workflowSteps: [{ id: 's1', kind: 'js-transform', title: 'assemble', outputVariable: 'data', role: 'assemble', script: '/* no return */' }],
+    }
+    const service = new ApiTestService(vi.fn(), {
+      globalVariableService: { list: () => [] } as never,
+      projectVariableService: { list: () => [] } as never,
+    })
+
+    const result = await service.run({ apiDefinition: apiNoReturn, params: {} })
+
+    expect(result.statusCode).toBe(200)
+    expect(result.response).toBeUndefined()
+    expect(result.size).toBe('0')
+  })
 })

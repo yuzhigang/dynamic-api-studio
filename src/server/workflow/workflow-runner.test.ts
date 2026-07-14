@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Knex } from 'knex'
 import type { ApiDefinitionDraft, WorkflowStep } from '@/shared/schemas/api-definition.schema'
 import { runWorkflow } from '@/server/workflow/workflow-runner'
+import { EnhancedSqlAnalyzer } from '@/server/analyzer'
 
 function buildApi(definition: Partial<ApiDefinitionDraft> & { workflowSteps: ApiDefinitionDraft['workflowSteps'] }): ApiDefinitionDraft {
   return {
@@ -137,5 +138,54 @@ describe('runWorkflow', () => {
     expect(result.error?.code).toBe('STEP_FAILED')
     expect(result.error?.stepId).toBe('s1')
     expect(rollback).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs read steps via knex.raw and write steps via trx.raw', async () => {
+    const knexRaw = vi.fn().mockResolvedValue({ rows: [{ cnt: 1 }] })
+    const trxRaw = vi.fn().mockResolvedValue({ rows: [{ id: 1 }] })
+    const trx = { raw: trxRaw, commit: vi.fn().mockResolvedValue(undefined), rollback: vi.fn().mockResolvedValue(undefined) } as unknown as Knex.Transaction
+    const openTransaction = vi.fn().mockResolvedValue(trx)
+    const pg = { id: 'dsA', name: 'pg', dialect: 'postgresql', host: 'h', port: 5432, database: 'd', username: 'u', password: 'p', createdAt: 't', updatedAt: 't' }
+    const deps = {
+      getDataSource: () => pg,
+      knexRegistry: { getOrCreate: () => ({ raw: knexRaw }) },
+      analyzer: new EnhancedSqlAnalyzer(),
+    } as never
+
+    const api = buildApi({
+      workflowSteps: [
+        { id: 's1', kind: 'sql-query', title: 'insert', outputVariable: 'ins', datasourceId: 'dsA', sql: 'INSERT INTO t (a) VALUES (1)' },
+        { id: 's2', kind: 'sql-query', title: 'count', outputVariable: 'cnt', datasourceId: 'dsA', sql: 'SELECT 1 AS cnt' },
+        { id: 's3', kind: 'js-transform', title: 'assemble', outputVariable: 'data', role: 'assemble', script: 'return { ok: true }' },
+      ],
+    })
+
+    const result = await runWorkflow(api, {}, {}, deps, { openTransaction })
+
+    expect(result.status).toBe('success')
+    expect(trxRaw).toHaveBeenCalledTimes(1)   // s1 is the write step
+    expect(knexRaw).toHaveBeenCalledTimes(1)  // s2 is the read step
+  })
+
+  it('returns STEP_FAILED when the transaction commit throws', async () => {
+    const trx = { commit: vi.fn().mockRejectedValue(new Error('commit failed')), rollback: vi.fn().mockResolvedValue(undefined), raw: vi.fn() } as unknown as Knex.Transaction
+    const openTransaction = vi.fn().mockResolvedValue(trx)
+    const pg = { id: 'dsA', name: 'pg', dialect: 'postgresql', host: 'h', port: 5432, database: 'd', username: 'u', password: 'p', createdAt: 't', updatedAt: 't' }
+    const deps = { getDataSource: () => pg, knexRegistry: { getOrCreate: () => ({}) }, analyzer: {} } as never
+
+    const api = buildApi({
+      workflowSteps: [
+        { id: 's1', kind: 'sql-query', title: 'insert', outputVariable: 'ins', datasourceId: 'dsA', sql: 'INSERT INTO t (a) VALUES (1)' },
+        { id: 's2', kind: 'js-transform', title: 'assemble', outputVariable: 'data', role: 'assemble', script: 'return 1' },
+      ],
+    })
+    const stub = vi.fn().mockResolvedValue(1)
+
+    const result = await runWorkflow(api, {}, {}, deps, { executeStep: stub, classifyStep: () => 'write', openTransaction })
+
+    expect(result.status).toBe('failed')
+    expect(result.error?.code).toBe('STEP_FAILED')
+    expect(result.error?.message).toMatch(/事务提交失败/)
+    expect(trx.rollback).toHaveBeenCalledTimes(1)
   })
 })

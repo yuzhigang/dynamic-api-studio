@@ -48,7 +48,7 @@ export class ApiTestService {
     return {
       statusCode: 200,
       durationMs,
-      size: JSON.stringify(run.response).length.toString(),
+      size: run.response === undefined ? '0' : JSON.stringify(run.response).length.toString(),
       requestPreview: params,
       response: run.response,
       logs: run.logs as ExecutionLog[],
