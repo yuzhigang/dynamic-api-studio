@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Knex } from 'knex'
 import { createVariableContext } from '@/server/analyzer/types'
+import { EnhancedSqlAnalyzer } from '@/server/analyzer'
 import { executeSql } from '@/server/workflow/sql-executor'
 import type { PlanCache, WorkflowSymbols } from '@/server/workflow/plan-cache'
 import type { DataSource } from '@/shared/contracts/data-source.contract'
@@ -12,6 +13,11 @@ const pg: DataSource = {
 }
 const symbols: WorkflowSymbols = { inputNames: [], globalNames: [], localNames: [], defaults: {} }
 
+const realPlan = new EnhancedSqlAnalyzer().analyze({
+  sql: 'SELECT 1', dialect: 'postgresql',
+  inputNames: [], globalNames: [], localNames: [], defaults: {},
+})
+
 function ctxWith(localRows: unknown[]) {
   const c = createVariableContext()
   c.set('local', 'rows', { value: localRows, type: 'array' })
@@ -19,7 +25,7 @@ function ctxWith(localRows: unknown[]) {
 }
 
 function fakePlanCache() {
-  return { getOrCompile: vi.fn(() => ({ sql: 'SELECT 1', params: [] })) } as unknown as PlanCache
+  return { getOrCompile: vi.fn(() => realPlan) } as unknown as PlanCache
 }
 
 function knexReturning(rawResult: unknown) {

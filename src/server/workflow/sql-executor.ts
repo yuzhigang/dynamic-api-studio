@@ -1,6 +1,6 @@
 import type { Knex } from 'knex'
 
-import type { CompiledSqlPlan, RenderResult, VariableContext } from '@/server/analyzer/types'
+import type { VariableContext } from '@/server/analyzer/types'
 import { renderFromPlan } from '@/server/analyzer/render-from-plan'
 import type { WorkflowStep } from '@/shared/schemas/api-definition.schema'
 import type { DataSource } from '@/shared/contracts/data-source.contract'
@@ -23,11 +23,6 @@ export type SqlExecutorOptions = {
   trx?: Knex.Transaction
 }
 
-/** Distinguish a full CompiledSqlPlan (needs rendering) from a pre-rendered RenderResult. */
-function isCompiledPlan(plan: unknown): plan is CompiledSqlPlan {
-  return typeof plan === 'object' && plan !== null && 'optionalConditions' in plan
-}
-
 export async function executeSql(
   step: WorkflowStep,
   context: VariableContext,
@@ -38,11 +33,7 @@ export async function executeSql(
   if (!dataSource) throw new Error(`数据源 ${step.datasourceId ?? ''} 不存在`)
 
   const plan = options.planCache.getOrCompile(step, options.symbols, { dataSource })
-  // PlanCache returns a CompiledSqlPlan that needs rendering via renderFromPlan;
-  // some test mocks return a pre-rendered RenderResult {sql, params} — handle both.
-  const rendered: RenderResult = isCompiledPlan(plan)
-    ? renderFromPlan(plan, bindVariableValues(context))
-    : (plan as RenderResult)
+  const rendered = renderFromPlan(plan, bindVariableValues(context))
   const paramValues = rendered.params.map((p) => p.value) as Knex.RawBinding[]
 
   const knex = deps.knexRegistry.getOrCreate(toKnexConfig(dataSource))
