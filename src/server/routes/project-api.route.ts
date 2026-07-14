@@ -5,6 +5,10 @@ import { ApiDefinitionRepository } from '@/server/domains/api-definition/api-def
 import { ApiDefinitionService } from '@/server/domains/api-definition/api-definition.service'
 import { ApiTestService } from '@/server/domains/api-test/api-test.service'
 import { DataSourceRepository } from '@/server/domains/data-source/data-source.repository'
+import { GlobalVariableService } from '@/server/domains/global-variable/global-variable.service'
+import { GlobalVariableRepository } from '@/server/domains/global-variable/global-variable.repository'
+import { ProjectVariableService } from '@/server/domains/project-variable/project-variable.service'
+import { ProjectVariableRepository } from '@/server/domains/project-variable/project-variable.repository'
 import { projectRepository } from '@/server/routes/project.route'
 import {
   apiDefinitionDraftSchema,
@@ -13,7 +17,13 @@ import {
 
 const apiDefinitionService = new ApiDefinitionService(new ApiDefinitionRepository())
 const dataSourceRepository = new DataSourceRepository()
-const apiTestService = new ApiTestService((id) => dataSourceRepository.get(id))
+const apiTestService = new ApiTestService(
+  (id) => dataSourceRepository.get(id),
+  {
+    globalVariableService: new GlobalVariableService(new GlobalVariableRepository()),
+    projectVariableService: new ProjectVariableService(new ProjectVariableRepository()),
+  },
+)
 
 export const projectApiRoute = new Hono()
   .get('/:projectId/apis', (context) => {

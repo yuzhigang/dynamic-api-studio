@@ -1,137 +1,57 @@
-import type { Knex } from 'knex'
-
 import { EnhancedSqlAnalyzer } from '@/server/analyzer'
-import { renderFromPlan } from '@/server/analyzer/render-from-plan'
+import { runWorkflow } from '@/server/workflow/workflow-runner'
+import { loadGlobalValues } from '@/server/workflow/global-variable-loader'
+import { KnexRegistry } from '@/server/infra/knex/knex-registry'
 import type { DataSource } from '@/shared/contracts/data-source.contract'
-import { KnexRegistry, type DataSourceConfig } from '@/server/infra/knex/knex-registry'
-import type {
-  ApiTestRequest,
-  ApiTestResult,
-  ExecutionLog,
-} from '@/shared/contracts/api-definition.contract'
+import type { GlobalVariableService } from '@/server/domains/global-variable/global-variable.service'
+import type { ProjectVariableService } from '@/server/domains/project-variable/project-variable.service'
+import type { ApiTestRequest, ApiTestResult, ExecutionLog } from '@/shared/contracts/api-definition.contract'
 
-const dialectToKnexClient: Record<DataSource['dialect'], string> = {
-  postgresql: 'pg',
-  mysql: 'mysql2',
-  oracle: 'oracledb',
-  sqlserver: 'mssql',
-  tdengine: 'tdengine',
+export type ApiTestServiceDeps = {
+  globalVariableService: GlobalVariableService
+  projectVariableService: ProjectVariableService
 }
 
 export class ApiTestService {
   private readonly analyzer = new EnhancedSqlAnalyzer()
   private readonly knexRegistry = new KnexRegistry()
 
-  constructor(private readonly getDataSource: (id: string) => DataSource | undefined) {}
+  constructor(
+    private readonly getDataSource: (id: string) => DataSource | undefined,
+    private readonly services: ApiTestServiceDeps,
+  ) {}
 
   async run(request: ApiTestRequest): Promise<ApiTestResult> {
-    // 简化版：只执行第一个 sql-query 步骤
-    const sqlStep = request.apiDefinition.workflowSteps.find((step) => step.kind === 'sql-query')
+    const { apiDefinition, params } = request
+    const globalValues = loadGlobalValues(apiDefinition.projectId, this.services)
 
-    if (!sqlStep || !sqlStep.sql || !sqlStep.datasourceId) {
-      return this.mockResult(request)
-    }
-
-    const dataSource = this.getDataSource(sqlStep.datasourceId)
-
-    if (!dataSource) {
-      throw new Error(`数据源 ${sqlStep.datasourceId} 不存在`)
-    }
-
-    const plan = this.analyzer.analyze({
-      sql: sqlStep.sql,
-      dialect: mapDialect(dataSource.dialect),
-      inputNames: request.apiDefinition.requestParams.map((p) => p.name),
-    })
-
-    const rendered = renderFromPlan(plan, {
-      input: request.params,
-      global: {},
-      local: {},
-    })
-
-    const knex = this.knexRegistry.getOrCreate(toKnexConfig(dataSource))
     const start = performance.now()
-    const rows = await knex.raw(rendered.sql, rendered.params.map((p) => p.value) as Knex.RawBinding[])
+    const run = await runWorkflow(apiDefinition, params, globalValues, {
+      knexRegistry: this.knexRegistry,
+      getDataSource: this.getDataSource,
+      analyzer: this.analyzer,
+    })
     const durationMs = Math.round(performance.now() - start)
+
+    if (run.status === 'failed') {
+      const statusCode = run.error?.code === 'INVALID_INPUT' ? 400 : 500
+      return {
+        statusCode,
+        durationMs,
+        size: '0',
+        requestPreview: params,
+        response: { code: run.error?.code, message: run.error?.message, details: run.error?.details },
+        logs: run.logs as ExecutionLog[],
+      }
+    }
 
     return {
       statusCode: 200,
       durationMs,
-      size: JSON.stringify(rows).length.toString(),
-      requestPreview: { sql: rendered.sql, params: rendered.params },
-      response: { rows },
-      logs: [{ time: new Date().toLocaleTimeString('zh-CN'), step: sqlStep.title, status: 'success', durationMs }],
+      size: JSON.stringify(run.response).length.toString(),
+      requestPreview: params,
+      response: run.response,
+      logs: run.logs as ExecutionLog[],
     }
-  }
-
-  private mockResult(request: ApiTestRequest): ApiTestResult {
-    const logs: ExecutionLog[] = request.apiDefinition.workflowSteps.map((step, index) => ({
-      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
-      step: `步骤 ${index + 1} - ${step.title}`,
-      status: 'success',
-      durationMs: 19 + index * 7,
-    }))
-
-    return {
-      statusCode: 200,
-      durationMs: logs.reduce((total, log) => total + log.durationMs, 0),
-      size: '1.50KB',
-      requestPreview: request.params,
-      response: {
-        code: 0,
-        msg: 'success',
-        data: {
-          list: [
-            {
-              order_id: '202406070001',
-              order_no: 'ORD-00001',
-              customer_name: request.params.customerName || '张三',
-              total_amount: 306.5,
-              status: 'PAID',
-              create_time: '2024-06-07 10:13:57',
-              items: [
-                {
-                  product_id: 1001,
-                  product_name: '无线鼠标 Pro',
-                  quantity: 2,
-                  price: 99.9,
-                },
-              ],
-            },
-          ],
-        },
-      },
-      logs,
-    }
-  }
-}
-
-function mapDialect(dialect: DataSource['dialect']): 'postgresql' | 'mysql' | 'oracle' | 'sqlserver' {
-  if (dialect === 'tdengine') {
-    // tdengine 语法接近 postgresql，解析器暂按 postgresql 处理
-    return 'postgresql'
-  }
-
-  return dialect
-}
-
-function toKnexConfig(dataSource: DataSource): DataSourceConfig {
-  const client = dialectToKnexClient[dataSource.dialect]
-
-  if (!client) {
-    throw new Error(`不支持的数据源方言：${dataSource.dialect}`)
-  }
-
-  return {
-    id: dataSource.id,
-    client,
-    connection: {
-      host: dataSource.host,
-      port: dataSource.port,
-      user: dataSource.username,
-      password: dataSource.password,
-      database: dataSource.database,
-    },
   }
 }
