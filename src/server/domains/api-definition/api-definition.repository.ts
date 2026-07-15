@@ -65,10 +65,12 @@ const initialDrafts: ApiDefinitionDraft[] = [
   createEmptyApiDefinition({
     id: 'api_order_query',
     projectId: 'project_order',
+    status: 'published',
   }),
   createEmptyApiDefinition({
     id: 'api_order_detail',
     projectId: 'project_order',
+    status: 'published',
     name: '订单详情接口',
     path: '/api/v1/order/detail',
     method: 'GET',
@@ -89,6 +91,7 @@ const initialDrafts: ApiDefinitionDraft[] = [
   createEmptyApiDefinition({
     id: 'api_product_query',
     projectId: 'project_order',
+    status: 'published',
     name: '商品查询接口',
     path: '/api/v1/product/query',
     method: 'POST',
@@ -109,6 +112,7 @@ const initialDrafts: ApiDefinitionDraft[] = [
   createEmptyApiDefinition({
     id: 'api_report_internal',
     projectId: 'project_order',
+    status: 'published',
     name: '内部报表接口',
     path: '/api/v1/report/internal',
     method: 'GET',
@@ -160,5 +164,15 @@ export class ApiDefinitionRepository {
       id,
       status: draft.status,
     }
+  }
+
+  listPublished(): ApiDefinitionDraft[] {
+    return Array.from(this.drafts.values()).filter((draft) => draft.status === 'published')
+  }
+
+  isPathMethodUnique(path: string, method: string, exceptId?: string): boolean {
+    return !this.listPublished().some(
+      (draft) => draft.path === path && draft.method === method && draft.id !== exceptId,
+    )
   }
 }
