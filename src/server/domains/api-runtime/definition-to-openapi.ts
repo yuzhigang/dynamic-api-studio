@@ -69,15 +69,21 @@ const errorSchema = z.object({ code: z.string(), message: z.string(), details: z
 
 /** Translate an API definition into a zod-openapi route (for routing + OpenAPI doc). */
 export function buildRoute(def: ApiDefinitionDraft) {
+  const responses: Record<string, unknown> = {
+    200: { content: { 'application/json': { schema: responseSchema(def) } }, description: '成功' },
+    400: { content: { 'application/json': { schema: errorSchema } }, description: '输入非法' },
+    500: { content: { 'application/json': { schema: errorSchema } }, description: '执行失败' },
+  }
+  if (def.requireAuth) {
+    responses[401] = { content: { 'application/json': { schema: errorSchema } }, description: '未登录' }
+    responses[403] = { content: { 'application/json': { schema: errorSchema } }, description: '权限不足' }
+  }
   return createRoute({
     method: def.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete',
     path: def.path,
     request: requestSchemaFor(def) as Parameters<typeof createRoute>[0]['request'],
-    responses: {
-      200: { content: { 'application/json': { schema: responseSchema(def) } }, description: '成功' },
-      400: { content: { 'application/json': { schema: errorSchema } }, description: '输入非法' },
-      500: { content: { 'application/json': { schema: errorSchema } }, description: '执行失败' },
-    },
+    responses: responses as Parameters<typeof createRoute>[0]['responses'],
+    ...(def.requireAuth ? { security: [{ bearerAuth: [] }] } : {}),
     summary: def.name,
     description: def.description,
     tags: def.tags,

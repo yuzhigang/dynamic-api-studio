@@ -54,4 +54,16 @@ describe('buildRoute', () => {
     const route = buildRoute(def())
     expect(Object.keys(route.responses).sort()).toEqual(['200', '400', '500'])
   })
+
+  it('adds 401/403 responses and bearer security when requireAuth', () => {
+    const route = buildRoute(def({ requireAuth: true }))
+    expect(Object.keys(route.responses).sort()).toEqual(['200', '400', '401', '403', '500'])
+    expect(route.security).toEqual([{ bearerAuth: [] }])
+  })
+
+  it('omits 401/403 and security when requireAuth false', () => {
+    const route = buildRoute(def({ requireAuth: false }))
+    expect(Object.keys(route.responses).sort()).toEqual(['200', '400', '500'])
+    expect(route.security).toBeUndefined()
+  })
 })
