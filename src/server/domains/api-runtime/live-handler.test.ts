@@ -7,7 +7,7 @@ import type { ApiDefinitionDraft } from '@/shared/schemas/api-definition.schema'
 function def(script: string): ApiDefinitionDraft {
   return {
     projectId: 'p1', status: 'published', name: 't', path: '/x', method: 'GET',
-    tags: [], permissions: [], bodyContentType: 'json',
+    tags: [], permissions: [], requireAuth: false, bodyContentType: 'json',
     requestParams: [{ id: 'r1', name: 'id', location: 'query', type: 'integer', required: true }],
     responseSchema: [], localVariables: [],
     workflowSteps: [{ id: 's1', kind: 'js-transform', title: 'assemble', outputVariable: 'data', role: 'assemble', script }],

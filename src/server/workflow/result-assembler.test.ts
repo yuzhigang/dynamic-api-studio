@@ -6,7 +6,7 @@ import type { ApiDefinitionDraft, WorkflowStep } from '@/shared/schemas/api-defi
 function api(steps: WorkflowStep[], responseSchema: ApiDefinitionDraft['responseSchema'] = []): ApiDefinitionDraft {
   return {
     projectId: 'p1', status: 'draft', name: 'a', path: '/a', method: 'POST',
-    tags: [], permissions: [], bodyContentType: 'json', requestParams: [],
+    tags: [], permissions: [], requireAuth: false, bodyContentType: 'json', requestParams: [],
     responseSchema, localVariables: [], workflowSteps: steps,
   } as ApiDefinitionDraft
 }

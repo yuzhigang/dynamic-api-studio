@@ -11,6 +11,7 @@ export function createEmptyApiDefinition(overrides: Partial<ApiDefinitionDraft> 
     method: 'POST',
     tags: ['订单', '查询', '内部接口'],
     permissions: ['订单', '查询', '内部接口'],
+    requireAuth: true,
     description: '根据条件查询订单及详情，返回分页结果。',
     bodyContentType: 'x-www-form-urlencoded',
     requestParams: [

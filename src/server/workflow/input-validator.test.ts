@@ -5,7 +5,7 @@ import type { ApiDefinitionDraft } from '@/shared/schemas/api-definition.schema'
 function buildApi(requestParams: ApiDefinitionDraft['requestParams']): ApiDefinitionDraft {
   return {
     projectId: 'p1', status: 'draft', name: 'a', path: '/a', method: 'POST',
-    tags: [], permissions: [], bodyContentType: 'json',
+    tags: [], permissions: [], requireAuth: false, bodyContentType: 'json',
     requestParams, responseSchema: [], localVariables: [], workflowSteps: [],
   } as ApiDefinitionDraft
 }

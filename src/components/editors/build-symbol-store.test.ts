@@ -10,6 +10,7 @@ const baseApi = {
   method: 'GET' as const,
   tags: [],
   permissions: [],
+  requireAuth: false,
   bodyContentType: 'json' as const,
   description: '',
   requestParams: [

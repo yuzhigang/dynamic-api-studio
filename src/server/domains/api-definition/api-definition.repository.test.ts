@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiDefinitionRepository } from '@/server/domains/api-definition/api-definition.repository'
+import { apiDefinitionDraftSchema } from '@/shared/contracts/api-definition.contract'
 
 describe('ApiDefinitionRepository published lookups', () => {
   const repository = new ApiDefinitionRepository()
@@ -22,5 +23,18 @@ describe('ApiDefinitionRepository published lookups', () => {
 
   it('isPathMethodUnique is true for a brand new path', () => {
     expect(repository.isPathMethodUnique('/api/v1/brand/new', 'POST')).toBe(true)
+  })
+
+  it('published seed demos are requireAuth=false (open) and schema defaults requireAuth=true', () => {
+    const published = repository.listPublished()
+    for (const d of published) {
+      expect(d.requireAuth).toBe(false)
+    }
+    const parsed = apiDefinitionDraftSchema.parse({
+      projectId: 'p', status: 'draft', name: 'n', path: '/x', method: 'GET',
+      tags: [], permissions: [], bodyContentType: 'json', requestParams: [], responseSchema: [],
+      localVariables: [], workflowSteps: [],
+    })
+    expect(parsed.requireAuth).toBe(true)
   })
 })
