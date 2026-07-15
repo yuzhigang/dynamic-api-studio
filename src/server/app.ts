@@ -14,6 +14,8 @@ import { projectRoute } from '@/server/routes/project.route'
 import { sqlAnalyzeRoute } from '@/server/routes/sql-analyze.route'
 import { sqlTestRoute } from '@/server/routes/sql-test.route'
 import { taskRoute } from '@/server/routes/task.route'
+import { getPublishedApp } from '@/server/domains/api-runtime/published-router'
+import { initPublishedRuntime } from '@/server/domains/api-runtime/runtime-wiring'
 
 const app = new Hono<AppBindings>().basePath('/api')
 
@@ -32,6 +34,10 @@ app
   .route('/sql', sqlAnalyzeRoute)
   .route('/sql', sqlTestRoute)
   .route('/tasks', taskRoute)
+
+// Published API dispatch: unmatched /api/* delegates to the swappable inner OpenAPIHono.
+initPublishedRuntime()
+app.all('/*', (c) => getPublishedApp().fetch(c.req.raw, c.env as Record<string, unknown>))
 
 app.notFound((context) =>
   context.json(
