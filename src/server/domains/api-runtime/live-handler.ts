@@ -17,7 +17,7 @@ export async function liveHandler(
   const has = (loc: RequestParam['location']) => def.requestParams.some((p) => p.location === loc)
   const validQuery = has('query') ? c.req.valid('query' as never) : {}
   const validHeader = has('header') ? c.req.valid('header' as never) : {}
-  const validBody = has('body') ? c.req.valid('json' as never) : {}
+  const validBody = has('body') && def.bodyContentType === 'json' ? c.req.valid('json' as never) : {}
   const inputValues: Record<string, unknown> = {}
   for (const p of def.requestParams) {
     if (p.location === 'query') inputValues[p.name] = (validQuery as Record<string, unknown>)[p.name]

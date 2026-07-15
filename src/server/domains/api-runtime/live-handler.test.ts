@@ -53,4 +53,24 @@ describe('liveHandler', () => {
     const body = await res.json()
     expect(body.code).toBe('STEP_FAILED')
   })
+
+  it('does not crash and returns 400 when body params exist but bodyContentType is not json', async () => {
+    const formDef = {
+      ...def('return { ok: true }'),
+      bodyContentType: 'x-www-form-urlencoded',
+      requestParams: [
+        { id: 'r1', name: 'id', location: 'query', type: 'integer', required: true },
+        { id: 'r2', name: 'payload', location: 'body', type: 'string', required: true },
+      ],
+    } as ApiDefinitionDraft
+    const app = new OpenAPIHono()
+    const route = createRoute({
+      method: 'get', path: '/x',
+      request: { query: z.object({ id: z.coerce.number().int() }) },
+      responses: { 200: { content: { 'application/json': { schema: z.unknown() } }, description: 'ok' } },
+    })
+    app.openapi(route, (c) => liveHandler(c, formDef, deps, services) as never)
+    const res = await app.request('/x?id=7')
+    expect(res.status).toBe(400)
+  })
 })
