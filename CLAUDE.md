@@ -224,6 +224,11 @@ dynamic-api-studio/
 │   │   │   │   ├── metadata.service.ts
 │   │   │   │   ├── metadata-provider.ts       # 元数据提供者接口
 │   │   │   │   └── database-introspector.ts   # 通用查询 + dialect provider 委托
+│   │   │   ├── api-runtime/             # 发布态运行时（Part B）
+│   │   │   │   ├── published-router.ts  # 可热替换内层 OpenAPIHono + rebuild + /api/openapi
+│   │   │   │   ├── definition-to-openapi.ts
+│   │   │   │   ├── live-handler.ts
+│   │   │   │   └── runtime-wiring.ts    # 共享 deps/services/repository + initPublishedRuntime
 │   │   │   ├── api-test/
 │   │   │   │   └── api-test.service.ts
 │   │   │   ├── function/
