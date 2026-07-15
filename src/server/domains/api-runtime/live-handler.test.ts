@@ -23,6 +23,7 @@ const services = {
   globalVariableService: { list: () => [] } as never,
   projectVariableService: { list: () => [] } as never,
 } as never
+const authDeps = { verifyToken: () => undefined, getPermissions: () => [] } as never
 
 function appFor(script: string) {
   const app = new OpenAPIHono()
@@ -31,7 +32,7 @@ function appFor(script: string) {
     request: { query: z.object({ id: z.coerce.number().int() }) },
     responses: { 200: { content: { 'application/json': { schema: z.unknown() } }, description: 'ok' } },
   })
-  app.openapi(route, (c) => liveHandler(c, def(script), deps, services) as never)
+  app.openapi(route, (c) => liveHandler(c, def(script), deps, services, authDeps) as never)
   return app
 }
 
@@ -69,7 +70,7 @@ describe('liveHandler', () => {
       request: { query: z.object({ id: z.coerce.number().int() }) },
       responses: { 200: { content: { 'application/json': { schema: z.unknown() } }, description: 'ok' } },
     })
-    app.openapi(route, (c) => liveHandler(c, formDef, deps, services) as never)
+    app.openapi(route, (c) => liveHandler(c, formDef, deps, services, authDeps) as never)
     const res = await app.request('/x?id=7')
     expect(res.status).toBe(400)
   })

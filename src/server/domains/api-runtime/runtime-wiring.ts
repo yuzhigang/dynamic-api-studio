@@ -6,10 +6,16 @@ import { GlobalVariableService } from '@/server/domains/global-variable/global-v
 import { GlobalVariableRepository } from '@/server/domains/global-variable/global-variable.repository'
 import { ProjectVariableService } from '@/server/domains/project-variable/project-variable.service'
 import { ProjectVariableRepository } from '@/server/domains/project-variable/project-variable.repository'
+import { UserRepository } from '@/server/domains/auth/user.repository'
+import { AuthSessionStore } from '@/server/domains/auth/auth-session.store'
+import type { AuthDeps } from '@/server/domains/auth/auth.contract'
 import { rebuildPublishedRouter } from '@/server/domains/api-runtime/published-router'
+import { authRoute } from '@/server/domains/auth/auth.route'
 
 export const apiDefinitionRepository = new ApiDefinitionRepository()
 export const dataSourceRepository = new DataSourceRepository()
+export const userRepository = new UserRepository()
+export const authSessionStore = new AuthSessionStore()
 
 export const runtimeDeps = {
   knexRegistry: new KnexRegistry(),
@@ -22,7 +28,15 @@ export const runtimeServices = {
   projectVariableService: new ProjectVariableService(new ProjectVariableRepository()),
 } as const
 
+export const authDeps: AuthDeps = {
+  verifyToken: (t) => authSessionStore.verify(t),
+  getPermissions: (id) => userRepository.getPermissions(id),
+}
+
+/** The auth (login) route — shares the session store + user repo with authDeps. */
+export const authApp = authRoute(userRepository, authSessionStore)
+
 /** Build the initial published router from seed data. Call once at server startup. */
 export function initPublishedRuntime(): void {
-  rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository)
+  rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository, authDeps)
 }

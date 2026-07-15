@@ -10,6 +10,7 @@ import {
   dataSourceRepository,
   runtimeDeps,
   runtimeServices,
+  authDeps,
 } from '@/server/domains/api-runtime/runtime-wiring'
 import { rebuildPublishedRouter } from '@/server/domains/api-runtime/published-router'
 
@@ -30,7 +31,7 @@ export const projectApiRoute = new Hono()
       return context.json({ message: 'path+method 已被其他已发布 API 占用' }, 409)
     }
     const saved = apiDefinitionService.save(projectId, draft)
-    rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository)
+    rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository, authDeps)
     return context.json(saved)
   })
   .get('/:projectId/apis/:apiId', (context) => {
@@ -45,7 +46,7 @@ export const projectApiRoute = new Hono()
       return context.json({ message: 'path+method 已被其他已发布 API 占用' }, 409)
     }
     const saved = apiDefinitionService.save(projectId, { ...draft, id: apiId, projectId })
-    rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository)
+    rebuildPublishedRouter(runtimeDeps, runtimeServices, apiDefinitionRepository, authDeps)
     return context.json(saved)
   })
   .post('/:projectId/apis/test-draft', zValidator('json', apiTestRequestSchema), async (context) =>

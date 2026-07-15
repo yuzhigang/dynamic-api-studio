@@ -5,6 +5,8 @@ import type { WorkflowDeps } from '@/server/workflow/workflow-runner'
 import { runWorkflow } from '@/server/workflow/workflow-runner'
 import type { GlobalVariableLoaderServices } from '@/server/workflow/global-variable-loader'
 import { loadGlobalValues } from '@/server/workflow/global-variable-loader'
+import type { AuthDeps } from '@/server/domains/auth/auth.contract'
+import { authorize } from '@/server/domains/auth/auth-guard'
 
 /** Per-route handler for a published API: zod-openapi validates the request; we merge
  *  c.req.valid() by location, run the workflow, and map the result to an HTTP response. */
@@ -13,7 +15,11 @@ export async function liveHandler(
   def: ApiDefinitionDraft,
   deps: WorkflowDeps,
   services: GlobalVariableLoaderServices,
+  authDeps: AuthDeps,
 ): Promise<Response> {
+  const denied = authorize(c, def, authDeps)
+  if (denied) return denied
+
   const has = (loc: RequestParam['location']) => def.requestParams.some((p) => p.location === loc)
   const validQuery = has('query') ? c.req.valid('query' as never) : {}
   const validHeader = has('header') ? c.req.valid('header' as never) : {}

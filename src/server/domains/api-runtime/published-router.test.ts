@@ -13,6 +13,7 @@ const services = {
   globalVariableService: { list: () => [] } as never,
   projectVariableService: { list: () => [] } as never,
 } as never
+const authDeps = { verifyToken: () => undefined, getPermissions: () => [] } as never
 
 function publishedDef(path: string, script: string): ApiDefinitionDraft {
   return {
@@ -27,7 +28,7 @@ describe('published-router', () => {
   it('serves a published route and 404s an unknown path', async () => {
     const repo = new ApiDefinitionRepository()
     repo.save('p1', publishedDef('/api/v1/rt/a', 'return { ok: "a" }'))
-    rebuildPublishedRouter(deps, services, repo)
+    rebuildPublishedRouter(deps, services, repo, authDeps)
 
     const app = getPublishedApp()
     const ok = await app.request('/api/v1/rt/a')
@@ -40,11 +41,11 @@ describe('published-router', () => {
 
   it('rebuild reflects a newly published def', async () => {
     const repo = new ApiDefinitionRepository()
-    rebuildPublishedRouter(deps, services, repo)
+    rebuildPublishedRouter(deps, services, repo, authDeps)
     expect((await getPublishedApp().request('/api/v1/rt/b')).status).toBe(404)
 
     repo.save('p1', publishedDef('/api/v1/rt/b', 'return { ok: "b" }'))
-    rebuildPublishedRouter(deps, services, repo)
+    rebuildPublishedRouter(deps, services, repo, authDeps)
     const res = await getPublishedApp().request('/api/v1/rt/b')
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: 'b' })
@@ -53,7 +54,7 @@ describe('published-router', () => {
   it('serves the OpenAPI doc at /api/openapi with the published path', async () => {
     const repo = new ApiDefinitionRepository()
     repo.save('p1', publishedDef('/api/v1/rt/c', 'return 1'))
-    rebuildPublishedRouter(deps, services, repo)
+    rebuildPublishedRouter(deps, services, repo, authDeps)
     const doc = await getPublishedApp().request('/api/openapi')
     expect(doc.status).toBe(200)
     const json = await doc.json() as { paths: Record<string, unknown> }
