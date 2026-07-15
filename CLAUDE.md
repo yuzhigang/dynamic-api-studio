@@ -231,6 +231,12 @@ dynamic-api-studio/
 │   │   │   │   └── runtime-wiring.ts    # 共享 deps/services/repository + initPublishedRuntime
 │   │   │   ├── api-test/
 │   │   │   │   └── api-test.service.ts
+│   │   │   ├── auth/                    # 鉴权（身份 + 授权）
+│   │   │   │   ├── user.repository.ts   # 内存 seed 用户
+│   │   │   │   ├── auth-session.store.ts
+│   │   │   │   ├── auth-guard.ts        # authorize 401/403/放行
+│   │   │   │   ├── auth.route.ts        # POST /api/auth/login
+│   │   │   │   └── auth.contract.ts     # AuthDeps 缝 + login schema
 │   │   │   ├── function/
 │   │   │   ├── scheduled-task/
 │   │   │   ├── parameter/
