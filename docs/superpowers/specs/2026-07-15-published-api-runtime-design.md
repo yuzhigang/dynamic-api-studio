@@ -23,7 +23,7 @@ Part B 把 `status="published"` 的 API 定义接成**真实可调用的 HTTP �
 | 重建机制 | Hono 路由只追加、无逐条移除；用"整批重建内层 app + 换引用"绕过，不用屏蔽中间件。重建毫秒级。 |
 | 响应体 | 成功直接返回 assemble 输出（**无信封**），OpenAPI responseSchema 即它本身。 |
 | 鉴权 | v1 不做（`permissions` 字段保留）；zod-openapi per-route 中间件为将来鉴权留缝。 |
-| 校验归属 | zod-openapi 只负责描述 + 路由；运行时校验走 `runWorkflow` 内部的 `validateInput`（错误格式统一）。 |
+| 校验归属 | live 路径请求校验由 zod-openapi 完成（`c.req.valid()`，400 为 zod-openapi 格式）；试运行面板由 `runWorkflow` 内部 `validateInput` 校验；`validateInput` 在 live 路径作 backstop。 |
 
 ---
 
@@ -35,8 +35,7 @@ Part B 是 Part A 引擎的第二个消费者。新域 `server/domains/api-runti
 | ---- | ---- |
 | `published-router.ts` | 持有可变 `currentPublishedApp: OpenAPIHono` + `rebuildPublishedRouter()` + `getPublishedApp()` |
 | `definition-to-openapi.ts` | 翻译器：`ApiDefinitionDraft` → zod query/body/header schema + response schema + OpenAPI metadata |
-| `request-param-extractor.ts` | 按 `requestParams.location` + `bodyContentType` 从 Hono 请求抽 `inputValues`（含标量强转） |
-| `live-handler.ts` | 单路由处理器：抽参 → `loadGlobalValues` → `runWorkflow` → 按 `error.code` 映射 HTTP → 返 assemble 输出 |
+| `live-handler.ts` | 单路由处理器：从 `c.req.valid()` 合并 `inputValues` → `loadGlobalValues` → `runWorkflow` → 按 `error.code` 映射 HTTP → 返 assemble 输出 |
 | 各模块 `*.test.ts` | 单测 |
 
 **仓库扩展**（`server/domains/api-definition/`）：
@@ -87,42 +86,36 @@ export function rebuildPublishedRouter(deps, services): void {
 
 ---
 
-## 3. Live handler + 参数抽取
+## 3. Live handler
 
-### 3.1 参数抽取（`request-param-extractor.ts`）
-
-```ts
-extractInputValues(c: Context, requestParams: RequestParam[], bodyContentType: string): Record<string, unknown>
-```
-
-- `location === 'query'` → `c.req.query(name)`
-- `location === 'header'` → `c.req.header(name)`
-- `location === 'body'` → 按 `bodyContentType` 解析后按 name 取值：
-  - `json` → `await c.req.json()`
-  - `x-www-form-urlencoded` / `form-data` → `await c.req.parseBody()`
-- **标量强转**：query/header 到的都是字符串，按 `param.type` 强转（`integer`/`decimal`→`Number`，`boolean`→`'true'/'false'`→`boolean`，`string`→原样）——否则 Part A 的 `validateInput`（严格 `typeof`）会把 `"7"` 判成类型不符。body（json）值已类型化，原样取。`array`/`object` 经 query 传来时 best-effort `JSON.parse`（边角，v1 不重点优化）。
-
-### 3.2 Live handler（`live-handler.ts`）
-
-每个 published 路由注册的处理器，闭包持有 `deps` + `services`（与服务试运行面板共用同一套实例）：
+每个 published 路由注册的处理器，闭包持有 `deps` + `services`（与试运行面板共用同一套实例）。请求校验由 zod-openapi 完成（路由的 request schema），handler 从 `c.req.valid()` 取已校验+强转的值，按 `requestParams.location` 合并成 `inputValues`：
 
 ```ts
 async function liveHandler(c: Context, def: ApiDefinitionDraft, deps, services): Promise<Response> {
-  const inputValues = extractInputValues(c, def.requestParams, def.bodyContentType)
+  const has = (loc: RequestParam['location']) => def.requestParams.some((p) => p.location === loc)
+  const validQuery = has('query') ? c.req.valid('query') : {}
+  const validHeader = has('header') ? c.req.valid('header') : {}
+  const validBody = has('body') ? c.req.valid('json') : {}
+  const inputValues: Record<string, unknown> = {}
+  for (const p of def.requestParams) {
+    if (p.location === 'query') inputValues[p.name] = validQuery[p.name]
+    else if (p.location === 'header') inputValues[p.name] = validHeader[p.name]
+    else inputValues[p.name] = validBody[p.name]
+  }
   const globalValues = loadGlobalValues(def.projectId, services)
   const run = await runWorkflow(def, inputValues, globalValues, deps, { onLog })
 
-  if (run.status === 'success') {
-    return c.json(run.response, 200)
-  }
+  if (run.status === 'success') return c.json(run.response, 200)
   const status = run.error?.code === 'INVALID_INPUT' ? 400 : 500
   return c.json({ code: run.error?.code, message: run.error?.message, details: run.error?.details }, status)
 }
 ```
 
+- 翻译器（§4.1）只为 def 里出现的 location 生成 zod schema（query/header/body），handler 对应有 schema 的 location 才调 `c.req.valid()`。
 - 成功 → **200**，body = `run.response`（assemble 输出，无信封）。
-- 失败 → status 由 `error.code` 定（`INVALID_INPUT`→400，`STEP_FAILED`/`ASSEMBLE_MISSING`/`WRITE_ACROSS_DATASOURCES`→500），body = `{ code, message, details? }`（错误对象，非数据信封；与 Part A 消费者一致）。
-- `onLog` 接 log-query 域的落库缝——v1 先接一个简单 logger（console），完整执行日志持久化推迟。
+- 失败 → status 由 `error.code` 定（`STEP_FAILED`/`ASSEMBLE_MISSING`/`WRITE_ACROSS_DATASOURCES`→500），body = `{ code, message, details? }`。**live 路径的"输入非法"400 由 zod-openapi 在 handler 之前返回**（zod 格式）；handler 内 `INVALID_INPUT` 分支主要服务于 runWorkflow 作 backstop 时及试运行面板。
+- **body content type**：v1 支持 JSON body（`c.req.valid('json')`）；`x-www-form-urlencoded`/`form-data` 推迟。
+- `onLog` 接 log-query 域落库缝——v1 先接简单 logger（console），完整执行日志持久化推迟。
 
 ---
 
@@ -135,7 +128,7 @@ async function liveHandler(c: Context, def: ApiDefinitionDraft, deps, services):
 - `responseSchema`（`SchemaField[]` 树）→ response zod 对象（嵌套对象/数组）。
 - `name` → OpenAPI `summary`，`description` → `description`，`tags` → `tags`。
 
-zod-openapi 用这些 schema 注册路由 + 生成文档；**运行时校验仍走 `runWorkflow` 内部的 `validateInput`**（错误格式统一），zod-openapi 只负责描述 + 路由。
+zod-openapi 用这些 schema 注册路由 + 校验请求 + 生成文档。live 路径请求校验由 zod-openapi 完成；`runWorkflow` 内部的 `validateInput` 作 backstop 并服务试运行面板。
 
 ### 4.2 OpenAPI 端点
 
@@ -161,7 +154,7 @@ zod-openapi 用这些 schema 注册路由 + 生成文档；**运行时校验仍�
 | 未知 path | 外层委托 → 内层 404 |
 | 方法不匹配（GET 打 POST-only 路由） | 内层 404（v1 不细分 405） |
 | 发布时 path+method 冲突 | 409 |
-| INVALID_INPUT | 400 `{ code, message, details }` |
+| INVALID_INPUT | live 路径由 zod-openapi 在 handler 前返回 400（zod 格式）；runWorkflow 的 INVALID_INPUT 400（`{ code, message, details }`）作 backstop |
 | STEP_FAILED / ASSEMBLE_MISSING / WRITE_ACROSS_DATASOURCES | 500 `{ code, message, details? }` |
 | handler 未预期抛错 | 外层 `app.onError` 兜底 500 |
 | 404 形状 | 未知 `/api/v1/*` 走外层委托到内层 404，与管理路由 `notFound` 形状略有差异——v1 接受（Minor） |
@@ -173,8 +166,7 @@ zod-openapi 用这些 schema 注册路由 + 生成文档；**运行时校验仍�
 ## 7. 测试策略
 
 - **`definition-to-openapi.test.ts`**：样例 def → 断言 zod query/body/header/response schema + OpenAPI metadata；边角（无 body 参数、responseSchema 树）。
-- **`request-param-extractor.test.ts`**：mock Hono context → 断言按 location 抽取 + 标量强转（integer/boolean/string）+ body 按 content type（json/form）+ 缺失可选参数。
-- **`live-handler.test.ts`**：stub `runWorkflow` → 断言 success(200 + raw response)、INVALID_INPUT(400)、STEP_FAILED(500)、错误体形状。
+- **`live-handler.test.ts`**：stub `runWorkflow` + 模拟带 valid 值的 Hono context（`c.req.valid()`）→ 断言 success(200 + raw response)、STEP_FAILED(500)、错误体形状；inputValues 由 requestParams + valid 值按 location 合并正确。
 - **`published-router.test.ts`**：从几条 published def 构建内层 app → 断言 published path 命中 handler、draft/未知 404；**重建**反映增删（publish 新定义 → 重建 → 新路由生效；unpublish → 重建 → 404）；OpenAPI 文档含 published paths。用真实 OpenAPIHono + stubbed handler。
 - **`api-definition.repository.test.ts`**（扩展）：`listPublished()` 只返 published；`isPathMethodUnique` true/false。
 - **集成**：save 触发重建——save 后 published 路由出现/消失。
@@ -188,13 +180,13 @@ zod-openapi 用这些 schema 注册路由 + 生成文档；**运行时校验仍�
 - 鉴权 / permissions（`permissions` 字段保留；per-route 中间件留缝）。
 - 执行日志持久化到 log-query 域（v1 onLog → 简单 logger）。
 - 405 Method Not Allowed（v1 统一 404）。
-- query array/object 参数的健壮解析（v1 best-effort `JSON.parse`）。
+- `x-www-form-urlencoded` / `form-data` body（v1 仅 JSON body，`c.req.valid('json')`）。
 - 响应严格 schema 校验（Part A 已是轻量校验 + 透传，live 返 raw）。
 - published path 里的路径参数（`requestParams` 无 `path` location，published path 是静态字面量；动态路径参数推迟）。
 - 持久化层（仓库仍内存 seed；将来落 DB 时 Part B 读同一仓库接口，无需改设计）。
 
 ### 8.2 与 Part A 契约的关系
 
-live handler 是引擎的**第二个消费者**（第一个是 Part A 的试运行面板），调用完全相同的 `runWorkflow(def, inputValues, globalValues, deps, options)` + `loadGlobalValues(projectId, services)`；`validateInput` 内置于 `runWorkflow`，live path 免费拿到输入校验 + 统一错误格式；`deps`（knexRegistry/getDataSource/analyzer）共用实例；`onLog` 接日志缝。
+live handler 是引擎的**第二个消费者**（第一个是 Part A 的试运行面板），调用完全相同的 `runWorkflow(def, inputValues, globalValues, deps, options)` + `loadGlobalValues(projectId, services)`；live 路径请求校验由 zod-openapi 完成，`runWorkflow` 的 `validateInput` 作 backstop 并服务试运行面板；`deps`（knexRegistry/getDataSource/analyzer）共用实例；`onLog` 接日志缝。
 
 兑现 Part A spec §8.2 的承诺：解析定义（by path+method）→ 抽 inputValues（by location）→ `loadGlobalValues` → `runWorkflow` → 按 `error.code` 映射 HTTP → 返 `response` 为 body。
