@@ -1,107 +1,144 @@
+import type { Kysely, Selectable } from 'kysely'
+
+import { createId } from '@/lib/id'
+import type { Database, ProjectTable } from '@/server/infra/db/tables'
 import type { Project, ProjectDraft } from '@/shared/contracts/project.contract'
 
-const now = '2026-06-27T00:00:00.000Z'
+type ProjectRow = Selectable<ProjectTable>
 
-const seedProjects: Project[] = [
-  {
-    id: 'project_order',
-    code: 'ORDER',
-    name: '订单中心',
-    description: '订单查询、明细和商品组装 API',
-    icon: 'ShoppingCart',
-    color: 'blue',
-    status: 'active',
-    apiCount: 6,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'project_crm',
-    code: 'CRM',
-    name: '客户中心',
-    description: '客户档案与画像相关 API',
-    icon: 'Users',
-    color: 'emerald',
-    status: 'active',
-    apiCount: 0,
-    createdAt: now,
-    updatedAt: now,
-  },
-]
+/**
+ * DB 行（snake_case + Date 时间戳 + null）→ 契约（camelCase + ISO 字符串 + undefined）。
+ * 审计字段（created_by/updated_by/deleted_at）为 DB 内部，不进入契约。
+ */
+function rowToProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    description: row.description ?? undefined,
+    icon: row.icon ?? undefined,
+    color: row.color ?? undefined,
+    status: row.status,
+    apiCount: row.api_count,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  }
+}
 
+/**
+ * Project repository —— 基于 Kysely 的 PostgreSQL 实现。
+ *
+ * 与原内存实现的语义对齐：
+ *  - `list` / `get` 只返回未软删除（`deleted_at is null`）的项目；当前无删除操作，故等价于全部。
+ *  - `save` 为 upsert：带 id 且存在 → 更新（保留 status/api_count/created_at；icon/color 缺省时沿用旧值）；
+ *    不存在或无 id → 插入（status='active', api_count=0）。
+ *  - `archive` 置 status='archived'；不存在返回 undefined。
+ *  - `copy` 以新 id 复制为 active、api_count=0 的项目（code 加 `_COPY` 后缀）。
+ *
+ * 与内存版的差异：`code` 受 DB 唯一约束——重复 copy 同一项目会因 `ORDER_COPY` 冲突报错（符合 db-model.md 设计）。
+ */
 export class ProjectRepository {
-  private projects = new Map(seedProjects.map((project) => [project.id, project]))
+  constructor(private readonly db: Kysely<Database>) {}
 
-  list() {
-    return Array.from(this.projects.values())
+  async list(): Promise<Project[]> {
+    const rows = await this.db
+      .selectFrom('project')
+      .selectAll()
+      .where('deleted_at', 'is', null)
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
+      .execute()
+    return rows.map(rowToProject)
   }
 
-  get(projectId: string) {
-    return this.projects.get(projectId)
+  async get(projectId: string): Promise<Project | undefined> {
+    const row = await this.db
+      .selectFrom('project')
+      .selectAll()
+      .where('id', '=', projectId)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return row ? rowToProject(row) : undefined
   }
 
-  save(draft: ProjectDraft) {
-    const timestamp = new Date().toISOString()
-    const id = draft.id ?? `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    const existing = this.projects.get(id)
-    const project: Project = {
-      id,
-      code: draft.code,
-      name: draft.name,
-      description: draft.description,
-      icon: draft.icon ?? existing?.icon,
-      color: draft.color ?? existing?.color,
-      status: existing?.status ?? 'active',
-      apiCount: existing?.apiCount ?? 0,
-      createdAt: existing?.createdAt ?? timestamp,
-      updatedAt: timestamp,
+  async save(draft: ProjectDraft): Promise<Project> {
+    const id = draft.id ?? createId('project')
+    const existing = await this.get(id)
+
+    if (existing) {
+      await this.db
+        .updateTable('project')
+        .set({
+          code: draft.code,
+          name: draft.name,
+          description: draft.description ?? null,
+          icon: draft.icon ?? existing.icon ?? null,
+          color: draft.color ?? existing.color ?? null,
+          updated_at: new Date(),
+        })
+        .where('id', '=', id)
+        .execute()
+    } else {
+      await this.db
+        .insertInto('project')
+        .values({
+          id,
+          code: draft.code,
+          name: draft.name,
+          description: draft.description ?? null,
+          icon: draft.icon ?? null,
+          color: draft.color ?? null,
+          status: 'active',
+          api_count: 0,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .execute()
     }
 
-    this.projects.set(id, project)
-    return project
+    const saved = await this.get(id)
+    if (!saved) {
+      throw new Error(`[project] save 后未找到项目 ${id}`)
+    }
+    return saved
   }
 
-  archive(projectId: string) {
-    const project = this.projects.get(projectId)
-
-    if (!project) {
-      return undefined
-    }
-
-    const archived: Project = {
-      ...project,
-      status: 'archived',
-      updatedAt: new Date().toISOString(),
-    }
-
-    this.projects.set(projectId, archived)
-    return archived
+  async archive(projectId: string): Promise<Project | undefined> {
+    await this.db
+      .updateTable('project')
+      .set({ status: 'archived', updated_at: new Date() })
+      .where('id', '=', projectId)
+      .where('deleted_at', 'is', null)
+      .execute()
+    return this.get(projectId)
   }
 
-  canCreateApi(projectId: string) {
-    return this.projects.get(projectId)?.status === 'active'
+  async canCreateApi(projectId: string): Promise<boolean> {
+    const project = await this.get(projectId)
+    return project?.status === 'active'
   }
 
-  copy(projectId: string) {
-    const project = this.projects.get(projectId)
+  async copy(projectId: string): Promise<Project | undefined> {
+    const source = await this.get(projectId)
+    if (!source) return undefined
 
-    if (!project) {
-      return undefined
-    }
+    const newId = createId('project')
+    await this.db
+      .insertInto('project')
+      .values({
+        id: newId,
+        code: `${source.code}_COPY`,
+        name: `${source.name} 副本`,
+        description: source.description ?? null,
+        icon: source.icon ?? null,
+        color: source.color ?? null,
+        status: 'active',
+        api_count: 0,
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
+      .execute()
 
-    const timestamp = new Date().toISOString()
-    const copied: Project = {
-      ...project,
-      id: `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      code: `${project.code}_COPY`,
-      name: `${project.name} 副本`,
-      status: 'active',
-      apiCount: 0,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }
-
-    this.projects.set(copied.id, copied)
-    return copied
+    return this.get(newId)
   }
 }

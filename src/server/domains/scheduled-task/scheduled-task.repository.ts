@@ -1,145 +1,190 @@
+import type { Kysely, Selectable } from 'kysely'
+
+import { createId } from '@/lib/id'
+import type { Database, ScheduleTaskLogTable, ScheduleTaskTable } from '@/server/infra/db/tables'
 import type {
   ScheduledTask,
   ScheduledTaskDraft,
   TaskRunLog,
+  Trigger,
 } from '@/shared/contracts/scheduled-task.contract'
 
-const now = '2026-06-28T00:00:00.000Z'
+type TaskRow = Selectable<ScheduleTaskTable>
+type LogRow = Selectable<ScheduleTaskLogTable>
 
-const seedTasks: ScheduledTask[] = [
-  {
-    id: 'task_cleanup',
-    name: '每日临时表清理',
-    description: '凌晨清理临时表数据',
-    enabled: true,
-    dataSourceId: 'ds_pg',
-    sql: "DELETE FROM tmp_order_snapshot WHERE created_at < NOW() - INTERVAL '1 day'",
-    trigger: { mode: 'cron', expression: '0 2 * * *' },
-    lastRunAt: '2026-06-28T02:00:00.000Z',
-    nextRunAt: '2026-06-29T02:00:00.000Z',
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'task_sync',
-    name: '订单指标同步',
-    description: '每 5 分钟刷新订单聚合指标',
-    enabled: true,
-    dataSourceId: 'ds_mysql',
-    sql: 'INSERT INTO order_metrics SELECT ... FROM orders',
-    trigger: { mode: 'interval', every: 5, unit: 'minute' },
-    lastRunAt: '2026-06-28T03:05:00.000Z',
-    nextRunAt: '2026-06-28T03:10:00.000Z',
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'task_report',
-    name: '周报快照',
-    description: '每周生成报表快照',
-    enabled: false,
-    dataSourceId: 'ds_report',
-    sql: 'INSERT INTO weekly_report SELECT * FROM report_view',
-    trigger: { mode: 'cron', expression: '0 8 * * 1' },
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'task_health',
-    name: '连接健康检查',
-    enabled: true,
-    dataSourceId: 'ds_pg',
-    sql: 'SELECT 1',
-    trigger: { mode: 'interval', every: 1, unit: 'hour' },
-    lastRunAt: '2026-06-28T03:00:00.000Z',
-    nextRunAt: '2026-06-28T04:00:00.000Z',
-    createdAt: now,
-    updatedAt: now,
-  },
-]
-
-function seedLogs(taskId: string): TaskRunLog[] {
-  return Array.from({ length: 12 }).map((_, index) => {
-    const failed = index % 5 === 2
-    return {
-      id: `${taskId}_run_${String(index + 1).padStart(3, '0')}`,
-      taskId,
-      startedAt: new Date(Date.parse('2026-06-28T03:00:00.000Z') - index * 600_000).toISOString(),
-      trigger: 'auto' as const,
-      status: failed ? ('failed' as const) : ('success' as const),
-      durationMs: failed ? 4200 : 80 + index * 7,
-      affectedRows: failed ? undefined : index * 3,
-      error: failed ? 'ER_LOCK_WAIT_TIMEOUT: lock wait timeout exceeded' : undefined,
-    }
-  })
+function rowToTask(row: TaskRow): ScheduledTask {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    enabled: row.enabled,
+    dataSourceId: row.datasource_id,
+    sql: row.sql,
+    trigger: row.trigger as Trigger,
+    lastRunAt: row.last_run_at ? row.last_run_at.toISOString() : undefined,
+    nextRunAt: row.next_run_at ? row.next_run_at.toISOString() : undefined,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  }
 }
 
+function rowToLog(row: LogRow): TaskRunLog {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    startedAt: row.started_at.toISOString(),
+    trigger: row.trigger,
+    status: row.status as TaskRunLog['status'],
+    durationMs: row.duration_ms ?? 0,
+    affectedRows: row.affected_rows ?? undefined,
+    error: row.error ?? undefined,
+  }
+}
+
+/**
+ * ScheduledTask repository —— Kysely 实现，跨 schedule_task + schedule_task_log 两表。
+ *
+ * 语义对齐内存版：
+ *  - `save` 为 upsert（保留 created_at/last_run_at/next_run_at；draft 不含后两者）。
+ *  - `remove` 软删除 schedule_task（row 留存、deleted_at 置位；logs 不动——FK 仍满足，list/get 过滤软删除）。
+ *  - `listLogs` 按 started_at desc 分页；`run` 插入一条 manual 成功日志并更新 last_run_at，返回该日志。
+ *
+ * `trigger` 是 jsonb 对象（非数组），pg 自动 stringify 对象，写库直接传；读回 cast 到 Trigger。
+ * FK：datasource_id→db_source.id（须存在）；schedule_task_log.task_id→schedule_task.id（ON DELETE CASCADE）。
+ */
 export class ScheduledTaskRepository {
-  private tasks = new Map(seedTasks.map((task) => [task.id, task]))
-  private logs = new Map<string, TaskRunLog[]>(seedTasks.map((task) => [task.id, seedLogs(task.id)]))
+  constructor(private readonly db: Kysely<Database>) {}
 
-  list() {
-    return Array.from(this.tasks.values())
+  async list(): Promise<ScheduledTask[]> {
+    const rows = await this.db
+      .selectFrom('schedule_task')
+      .selectAll()
+      .where('deleted_at', 'is', null)
+      .orderBy('updated_at', 'desc')
+      .orderBy('id', 'desc')
+      .execute()
+    return rows.map(rowToTask)
   }
 
-  get(taskId: string) {
-    return this.tasks.get(taskId)
+  async get(taskId: string): Promise<ScheduledTask | undefined> {
+    const row = await this.db
+      .selectFrom('schedule_task')
+      .selectAll()
+      .where('id', '=', taskId)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return row ? rowToTask(row) : undefined
   }
 
-  save(draft: ScheduledTaskDraft) {
-    const timestamp = new Date().toISOString()
-    const id = draft.id ?? `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    const existing = this.tasks.get(id)
-    const task: ScheduledTask = {
-      id,
-      name: draft.name,
-      description: draft.description,
-      enabled: draft.enabled,
-      dataSourceId: draft.dataSourceId,
-      sql: draft.sql,
-      trigger: draft.trigger,
-      lastRunAt: existing?.lastRunAt,
-      nextRunAt: existing?.nextRunAt,
-      createdAt: existing?.createdAt ?? timestamp,
-      updatedAt: timestamp,
+  async save(draft: ScheduledTaskDraft): Promise<ScheduledTask> {
+    const id = draft.id ?? createId('task')
+    const now = new Date()
+    await this.db
+      .insertInto('schedule_task')
+      .values({
+        id,
+        name: draft.name,
+        description: draft.description ?? null,
+        enabled: draft.enabled,
+        datasource_id: draft.dataSourceId,
+        sql: draft.sql,
+        trigger: draft.trigger,
+        last_run_at: null,
+        next_run_at: null,
+        created_at: now,
+        updated_at: now,
+      })
+      .onConflict((oc) =>
+        oc.column('id').doUpdateSet({
+          name: draft.name,
+          description: draft.description ?? null,
+          enabled: draft.enabled,
+          datasource_id: draft.dataSourceId,
+          sql: draft.sql,
+          trigger: draft.trigger,
+          updated_at: now,
+        }),
+      )
+      .execute()
+
+    const saved = await this.get(id)
+    if (!saved) {
+      throw new Error(`[scheduled-task] save 后未找到任务 ${id}`)
     }
-    this.tasks.set(id, task)
-    if (!this.logs.has(id)) {
-      this.logs.set(id, [])
-    }
-    return task
+    return saved
   }
 
-  remove(taskId: string) {
-    const existed = this.tasks.delete(taskId)
-    this.logs.delete(taskId)
-    return existed
+  async remove(taskId: string): Promise<boolean> {
+    const existing = await this.get(taskId)
+    if (!existing) return false
+
+    await this.db
+      .updateTable('schedule_task')
+      .set({ deleted_at: new Date(), updated_at: new Date() })
+      .where('id', '=', taskId)
+      .execute()
+    return true
   }
 
-  listLogs(taskId: string, page: number, pageSize: number) {
-    const all = this.logs.get(taskId) ?? []
-    const start = (page - 1) * pageSize
-    return { items: all.slice(start, start + pageSize), total: all.length, page, pageSize }
+  async listLogs(taskId: string, page: number, pageSize: number): Promise<{ items: TaskRunLog[]; total: number; page: number; pageSize: number }> {
+    const total = await this.db
+      .selectFrom('schedule_task_log')
+      .select(this.db.fn.countAll().as('total'))
+      .where('task_id', '=', taskId)
+      .executeTakeFirst()
+    const totalNumber = Number(total?.total ?? 0)
+
+    const rows = await this.db
+      .selectFrom('schedule_task_log')
+      .selectAll()
+      .where('task_id', '=', taskId)
+      .orderBy('started_at', 'desc')
+      .orderBy('id', 'desc')
+      .limit(pageSize)
+      .offset((page - 1) * pageSize)
+      .execute()
+
+    return { items: rows.map(rowToLog), total: totalNumber, page, pageSize }
   }
 
-  run(taskId: string): TaskRunLog | undefined {
-    const task = this.tasks.get(taskId)
-    if (!task) {
-      return undefined
-    }
-    const timestamp = new Date().toISOString()
-    const log: TaskRunLog = {
-      id: `${taskId}_run_${Date.now()}`,
+  async run(taskId: string): Promise<TaskRunLog | undefined> {
+    const task = await this.get(taskId)
+    if (!task) return undefined
+
+    const now = new Date()
+    const logId = `${taskId}_run_${now.getTime()}`
+    const durationMs = 60 + Math.floor(Math.random() * 200)
+    const affectedRows = Math.floor(Math.random() * 50)
+
+    await this.db
+      .insertInto('schedule_task_log')
+      .values({
+        id: logId,
+        task_id: taskId,
+        started_at: now,
+        trigger: 'manual',
+        status: 'success',
+        duration_ms: durationMs,
+        affected_rows: affectedRows,
+        error: null,
+      })
+      .execute()
+
+    await this.db
+      .updateTable('schedule_task')
+      .set({ last_run_at: now, updated_at: now })
+      .where('id', '=', taskId)
+      .where('deleted_at', 'is', null)
+      .execute()
+
+    return {
+      id: logId,
       taskId,
-      startedAt: timestamp,
+      startedAt: now.toISOString(),
       trigger: 'manual',
       status: 'success',
-      durationMs: 60 + Math.floor(Math.random() * 200),
-      affectedRows: Math.floor(Math.random() * 50),
+      durationMs,
+      affectedRows,
     }
-    const existing = this.logs.get(taskId) ?? []
-    this.logs.set(taskId, [log, ...existing])
-    this.tasks.set(taskId, { ...task, lastRunAt: timestamp, updatedAt: timestamp })
-    return log
   }
 }

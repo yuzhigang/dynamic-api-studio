@@ -14,7 +14,7 @@ const DEFAULT_TIMEOUT_MS = 30_000
 
 export type SqlExecutorDeps = {
   knexRegistry: KnexRegistry
-  getDataSource: (id: string) => DataSource | undefined
+  getDataSource: (id: string) => Promise<DataSource | undefined>
 }
 
 export type SqlExecutorOptions = {
@@ -29,7 +29,7 @@ export async function executeSql(
   deps: SqlExecutorDeps,
   options: SqlExecutorOptions,
 ): Promise<unknown> {
-  const dataSource = deps.getDataSource(step.datasourceId ?? '')
+  const dataSource = await deps.getDataSource(step.datasourceId ?? '')
   if (!dataSource) throw new Error(`数据源 ${step.datasourceId ?? ''} 不存在`)
 
   const plan = options.planCache.getOrCompile(step, options.symbols, { dataSource })

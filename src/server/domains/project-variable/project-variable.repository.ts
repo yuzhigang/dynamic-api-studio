@@ -1,77 +1,132 @@
-import type {
-  ProjectVariable,
-  ProjectVariableDraft,
-} from '@/shared/contracts/project-variable.contract'
+import type { Kysely, Selectable } from 'kysely'
 
-const now = '2026-06-28T00:00:00.000Z'
+import { createId } from '@/lib/id'
+import { jsonbArray } from '@/server/infra/db/repository-helpers'
+import type { Database, VariableTable } from '@/server/infra/db/tables'
+import type { ProjectVariable, ProjectVariableDraft } from '@/shared/contracts/project-variable.contract'
 
-const seedProjectVariables: ProjectVariable[] = [
-  {
-    id: 'pv_order_region',
-    projectId: 'project_order',
-    name: 'region',
-    label: '区域',
-    kind: 'single',
-    value: 'CN',
-    items: [],
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'pv_order_channels',
-    projectId: 'project_order',
-    name: 'channels',
-    label: '渠道',
-    kind: 'list',
-    value: '',
-    items: ['web', 'app', 'pos'],
-    createdAt: now,
-    updatedAt: now,
-  },
-]
+type VariableRow = Selectable<VariableTable>
 
+/** DB 行 → 契约。scope/description 为 DB 内部；project_id 映射为 projectId。 */
+function rowToProjectVariable(row: VariableRow): ProjectVariable {
+  return {
+    id: row.id,
+    projectId: row.project_id ?? '',
+    name: row.name,
+    label: row.label,
+    kind: row.kind,
+    value: row.value ?? '',
+    items: row.items ?? [],
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  }
+}
+
+/**
+ * ProjectVariable repository —— Kysely 实现（variable 表 scope='project'，project_id=projectId）。
+ *
+ * 语义对齐内存版：`save(projectId, draft)` 为 upsert（保留 created_at 与 project_id；single/list 互斥清理）；
+ * 重名校验限定在 (scope='project', project_id) 内；`remove` 软删除；jsonb 数组 items 写前 `JSON.stringify`。
+ */
 export class ProjectVariableRepository {
-  private variables = new Map(seedProjectVariables.map((variable) => [variable.id, variable]))
+  constructor(private readonly db: Kysely<Database>) {}
 
-  list(projectId: string) {
-    return Array.from(this.variables.values()).filter((variable) => variable.projectId === projectId)
+  async list(projectId: string): Promise<ProjectVariable[]> {
+    const rows = await this.db
+      .selectFrom('variable')
+      .selectAll()
+      .where('scope', '=', 'project')
+      .where('project_id', '=', projectId)
+      .where('deleted_at', 'is', null)
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
+      .execute()
+    return rows.map(rowToProjectVariable)
   }
 
-  get(variableId: string) {
-    return this.variables.get(variableId)
+  async get(variableId: string): Promise<ProjectVariable | undefined> {
+    const row = await this.db
+      .selectFrom('variable')
+      .selectAll()
+      .where('id', '=', variableId)
+      .where('scope', '=', 'project')
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return row ? rowToProjectVariable(row) : undefined
   }
 
-  save(projectId: string, draft: ProjectVariableDraft) {
-    const timestamp = new Date().toISOString()
-    const id = draft.id ?? `pv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  async save(projectId: string, draft: ProjectVariableDraft): Promise<ProjectVariable> {
+    const id = draft.id ?? createId('pv')
+    await this.assertNameUnique(projectId, draft.name, id)
 
-    const duplicate = Array.from(this.variables.values()).find(
-      (variable) =>
-        variable.projectId === projectId && variable.name === draft.name && variable.id !== id,
-    )
+    const existing = await this.get(id)
+    const value = draft.kind === 'single' ? draft.value : ''
+    const items = draft.kind === 'list' ? draft.items : []
 
-    if (duplicate) {
-      throw new Error(`变量名「${draft.name}」已存在`)
+    if (existing) {
+      await this.db
+        .updateTable('variable')
+        .set({
+          name: draft.name,
+          label: draft.label,
+          kind: draft.kind,
+          value,
+          items: jsonbArray(items),
+          updated_at: new Date(),
+        })
+        .where('id', '=', id)
+        .execute()
+    } else {
+      const now = new Date()
+      await this.db
+        .insertInto('variable')
+        .values({
+          id,
+          scope: 'project',
+          project_id: projectId,
+          name: draft.name,
+          label: draft.label,
+          kind: draft.kind,
+          value,
+          items: jsonbArray(items),
+          description: null,
+          created_at: now,
+          updated_at: now,
+        })
+        .execute()
     }
 
-    const existing = this.variables.get(id)
-    const variable: ProjectVariable = {
-      id,
-      projectId,
-      name: draft.name,
-      label: draft.label,
-      kind: draft.kind,
-      value: draft.kind === 'single' ? draft.value : '',
-      items: draft.kind === 'list' ? draft.items : [],
-      createdAt: existing?.createdAt ?? timestamp,
-      updatedAt: timestamp,
+    const saved = await this.get(id)
+    if (!saved) {
+      throw new Error(`[project-variable] save 后未找到变量 ${id}`)
     }
-
-    this.variables.set(id, variable)
-    return variable
+    return saved
   }
 
-  remove(variableId: string) {
-    return this.variables.delete(variableId)
+  async remove(variableId: string): Promise<boolean> {
+    const existing = await this.get(variableId)
+    if (!existing) return false
+
+    await this.db
+      .updateTable('variable')
+      .set({ deleted_at: new Date(), updated_at: new Date() })
+      .where('id', '=', variableId)
+      .execute()
+    return true
+  }
+
+  private async assertNameUnique(projectId: string, name: string, id: string): Promise<void> {
+    const conflict = await this.db
+      .selectFrom('variable')
+      .select('id')
+      .where('scope', '=', 'project')
+      .where('project_id', '=', projectId)
+      .where('name', '=', name)
+      .where('id', '<>', id)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    if (conflict) {
+      throw new Error(`变量名「${name}」已存在`)
+    }
   }
 }

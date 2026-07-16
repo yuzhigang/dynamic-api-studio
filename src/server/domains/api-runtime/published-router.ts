@@ -26,15 +26,15 @@ export function registerPublishedRoute(
 }
 
 /** Rebuild the inner published app from the live repo. Cheap; call on startup and after every api save. */
-export function rebuildPublishedRouter(
+export async function rebuildPublishedRouter(
   deps: WorkflowDeps,
   services: GlobalVariableLoaderServices,
   repository: ApiDefinitionRepository,
   authDeps: AuthDeps,
-): void {
+): Promise<void> {
   const app = new OpenAPIHono()
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer' })
-  for (const def of repository.listPublished()) {
+  for (const def of await repository.listPublished()) {
     registerPublishedRoute(app, def, deps, services, authDeps)
   }
   app.doc('/api/openapi', { openapi: '3.0.0', info: { title: 'Dynamic API Studio', version: '1.0.0' } })

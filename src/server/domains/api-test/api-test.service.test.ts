@@ -14,7 +14,7 @@ function api(): ApiDefinitionDraft {
 
 describe('ApiTestService', () => {
   it('runs the workflow and packages an ApiTestResult', async () => {
-    const getDataSource = vi.fn()
+    const getDataSource = vi.fn(async () => undefined)
     const globalVariableService = { list: () => [] } as never
     const projectVariableService = { list: () => [] } as never
     const service = new ApiTestService(getDataSource, { globalVariableService, projectVariableService })
@@ -32,7 +32,7 @@ describe('ApiTestService', () => {
       ...api(),
       requestParams: [{ id: 'r1', name: 'id', location: 'query', type: 'integer', required: true }],
     }
-    const service = new ApiTestService(vi.fn(), {
+    const service = new ApiTestService(vi.fn(async () => undefined), {
       globalVariableService: { list: () => [] } as never,
       projectVariableService: { list: () => [] } as never,
     })
@@ -47,7 +47,7 @@ describe('ApiTestService', () => {
       ...api(),
       workflowSteps: [{ id: 's1', kind: 'js-transform', title: 'assemble', outputVariable: 'data', role: 'assemble', script: '/* no return */' }],
     }
-    const service = new ApiTestService(vi.fn(), {
+    const service = new ApiTestService(vi.fn(async () => undefined), {
       globalVariableService: { list: () => [] } as never,
       projectVariableService: { list: () => [] } as never,
     })

@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { DataSourceRepository } from '@/server/domains/data-source/data-source.repository'
+import { platformDb } from '@/server/infra/db/db'
+import { dbAvailable, withRollback } from '@/server/infra/db/db-test-helpers'
+import { seedDemoData } from '@/server/infra/db/seed'
 import type { DataSourceDraft } from '@/shared/contracts/data-source.contract'
 
 const draft: DataSourceDraft = {
@@ -15,46 +18,56 @@ const draft: DataSourceDraft = {
 }
 
 describe('DataSourceRepository', () => {
-  it('creates a new data source with generated id and timestamps', () => {
-    const repository = new DataSourceRepository()
-    const before = repository.list().length
-
-    const created = repository.save(draft)
-
-    expect(created.id).toBeTruthy()
-    expect(created.name).toBe('测试库')
-    expect(created.createdAt).toBe(created.updatedAt)
-    expect(repository.list()).toHaveLength(before + 1)
+  beforeAll(async () => {
+    if (dbAvailable) await seedDemoData(platformDb)
   })
 
-  it('updates an existing data source while preserving createdAt', () => {
-    const repository = new DataSourceRepository()
-    const created = repository.save(draft)
+  it.skipIf(!dbAvailable)('creates a new data source with generated id and timestamps', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new DataSourceRepository(trx)
+      const before = (await repository.list()).length
 
-    const updated = repository.save({ ...draft, id: created.id, name: '改名后' })
+      const created = await repository.save(draft)
 
-    expect(updated.id).toBe(created.id)
-    expect(updated.name).toBe('改名后')
-    expect(updated.createdAt).toBe(created.createdAt)
+      expect(created.id).toBeTruthy()
+      expect(created.name).toBe('测试库')
+      expect(created.createdAt).toBe(created.updatedAt)
+      expect(await repository.list()).toHaveLength(before + 1)
+    })
   })
 
-  it('removes a data source', () => {
-    const repository = new DataSourceRepository()
-    const created = repository.save(draft)
+  it.skipIf(!dbAvailable)('updates an existing data source while preserving createdAt', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new DataSourceRepository(trx)
+      const created = await repository.save(draft)
 
-    expect(repository.remove(created.id)).toBe(true)
-    expect(repository.get(created.id)).toBeUndefined()
-    expect(repository.remove(created.id)).toBe(false)
+      const updated = await repository.save({ ...draft, id: created.id, name: '改名后' })
+
+      expect(updated.id).toBe(created.id)
+      expect(updated.name).toBe('改名后')
+      expect(updated.createdAt).toBe(created.createdAt)
+    })
+  })
+
+  it.skipIf(!dbAvailable)('removes a data source', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new DataSourceRepository(trx)
+      const created = await repository.save(draft)
+
+      expect(await repository.remove(created.id)).toBe(true)
+      expect(await repository.get(created.id)).toBeUndefined()
+      expect(await repository.remove(created.id)).toBe(false)
+    })
   })
 
   it('reports success when host and database are present', () => {
-    const repository = new DataSourceRepository()
+    const repository = new DataSourceRepository({} as never)
 
     expect(repository.testConnection(draft).success).toBe(true)
   })
 
   it('reports failure when host is missing', () => {
-    const repository = new DataSourceRepository()
+    const repository = new DataSourceRepository({} as never)
 
     const result = repository.testConnection({ ...draft, host: '  ' })
 

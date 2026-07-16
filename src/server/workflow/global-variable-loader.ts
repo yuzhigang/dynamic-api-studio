@@ -8,14 +8,21 @@ export type GlobalVariableLoaderServices = {
   projectVariableService: ProjectVariableService
 }
 
-/** Load platform globals + project variables into a flat record; project overrides platform on name collision. */
-export function loadGlobalValues(projectId: string, services: GlobalVariableLoaderServices): Record<string, unknown> {
+/**
+ * Load platform globals + project variables into a flat record; project overrides platform on name collision.
+ *
+ * 变量 repository 已迁 Kysely（list 为异步），故本函数异步；调用方需 await。
+ */
+export async function loadGlobalValues(
+  projectId: string,
+  services: GlobalVariableLoaderServices,
+): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {}
 
-  for (const variable of services.globalVariableService.list() as ScopedVariable[]) {
+  for (const variable of (await services.globalVariableService.list()) as ScopedVariable[]) {
     result[variable.name] = variableValue(variable)
   }
-  for (const variable of services.projectVariableService.list(projectId) as ScopedVariable[]) {
+  for (const variable of (await services.projectVariableService.list(projectId)) as ScopedVariable[]) {
     result[variable.name] = variableValue(variable)
   }
 

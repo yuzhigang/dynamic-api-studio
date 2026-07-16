@@ -6,37 +6,44 @@ function serviceReturning(vars: Array<{ name: string; kind: 'single' | 'list'; v
 }
 
 describe('loadGlobalValues', () => {
-  it('loads single and list variables from platform globals', () => {
+  it('loads single and list variables from platform globals', async () => {
     const globalService = serviceReturning([
       { name: 'page', kind: 'single', value: '20', items: [] },
       { name: 'status', kind: 'list', value: '', items: ['active', 'closed'] },
     ])
     const projectService = { list: () => [] } as unknown as Parameters<typeof loadGlobalValues>[1]['projectVariableService']
 
-    expect(loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService })).toEqual({
+    expect(
+      await loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService }),
+    ).toEqual({
       page: '20',
       status: ['active', 'closed'],
     })
   })
 
-  it('project variables override platform globals on name collision', () => {
+  it('project variables override platform globals on name collision', async () => {
     const globalService = serviceReturning([{ name: 'page', kind: 'single', value: '20', items: [] }])
     const projectService = {
       list: () => [{ name: 'page', kind: 'single', value: '50', items: [] }],
     } as unknown as Parameters<typeof loadGlobalValues>[1]['projectVariableService']
 
-    expect(loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService })).toEqual({ page: '50' })
+    expect(
+      await loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService }),
+    ).toEqual({ page: '50' })
   })
 
-  it('filters project variables by projectId', () => {
+  it('filters project variables by projectId', async () => {
     const projectService = {
-      list: (projectId: string) => projectId === 'p1'
-        ? [{ name: 'region', kind: 'single', value: 'CN', items: [] }]
-        : [],
+      list: (projectId: string) =>
+        projectId === 'p1' ? [{ name: 'region', kind: 'single', value: 'CN', items: [] }] : [],
     } as unknown as Parameters<typeof loadGlobalValues>[1]['projectVariableService']
     const globalService = serviceReturning([])
 
-    expect(loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService })).toEqual({ region: 'CN' })
-    expect(loadGlobalValues('p2', { globalVariableService: globalService, projectVariableService: projectService })).toEqual({})
+    expect(
+      await loadGlobalValues('p1', { globalVariableService: globalService, projectVariableService: projectService }),
+    ).toEqual({ region: 'CN' })
+    expect(
+      await loadGlobalValues('p2', { globalVariableService: globalService, projectVariableService: projectService }),
+    ).toEqual({})
   })
 })

@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { homeOverviewRoute } from '@/server/routes/home-overview.route'
+import { platformDb } from '@/server/infra/db/db'
+import { dbAvailable } from '@/server/infra/db/db-test-helpers'
+import { seedDemoData } from '@/server/infra/db/seed'
 
-describe('GET /api/home/invocations', () => {
-  it('returns paginated mock invocation logs', async () => {
+// /invocations 已改为读 api_invocation_log（DB），依赖平台库 + seed 28 条 demo 日志。无 .env 时整组跳过。
+describe.skipIf(!dbAvailable)('GET /api/home/invocations', () => {
+  beforeAll(async () => {
+    await seedDemoData(platformDb)
+  })
+
+  it('returns paginated invocation logs', async () => {
     const response = await homeOverviewRoute.request('/invocations?page=1&pageSize=10')
     expect(response.status).toBe(200)
 

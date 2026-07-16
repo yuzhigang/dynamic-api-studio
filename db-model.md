@@ -215,7 +215,7 @@ API 元信息。请求/响应结构通过 FK 引用可复用的 `json_schema` �
 
 ## 6. db_schema — 数据源元数据缓存
 
-对 `db_source` 探测 `information_schema` 后缓存的表/列结构，驱动编辑器补全。属缓存表，可重建，不软删除。
+对 `db_source` 探测 `information_schema` 后缓存的表/列/外键/索引结构，驱动编辑器补全。属缓存表，可重建，不软删除。
 
 | 字段 | 类型 | 约束 | 说明 |
 |---|---|---|---|
@@ -223,13 +223,15 @@ API 元信息。请求/响应结构通过 FK 引用可复用的 `json_schema` �
 | `db_source_id` | VARCHAR(36) | NOT NULL, FK→db_source.id | 所属数据源 |
 | `schema_name` | VARCHAR(128) | NULL | 库内 schema 名（PG schema / 多库实例） |
 | `object_type` | VARCHAR(16) | NOT NULL | `table` \| `view` |
-| `table_name` | VARCHAR(128) | NOT NULL | 表/视图名 |
+| `object_name` | VARCHAR(128) | NOT NULL | 表/视图名 |
 | `columns` | JSON | NOT NULL | 列定义数组（见下） |
-| `introspected_at` | TIMESTAMP | NOT NULL | 本次探测时间 |
+| `foreign_keys` | JSON | NULL | 外键定义数组（见下）；视图/无外键时为 NULL |
+| `indexes` | JSON | NULL | 索引定义数组（见下） |
+| `comment` | TEXT | NULL | 表/视图注释 |
 | `created_at` | TIMESTAMP | NOT NULL | 首次缓存时间 |
-| `updated_at` | TIMESTAMP | NOT NULL | 最后刷新时间 |
+| `updated_at` | TIMESTAMP | NOT NULL | 最后刷新时间（兼作探测时间） |
 
-**索引**：`INDEX(db_source_id)`、`UNIQUE(db_source_id, schema_name, table_name)`
+**索引**：`INDEX(db_source_id)`、`UNIQUE(db_source_id, schema_name, object_name)`
 
 ### `columns` 结构（JSON）
 
@@ -238,10 +240,41 @@ API 元信息。请求/响应结构通过 FK 引用可复用的 `json_schema` �
   {
     "name": "order_no",
     "dataType": "varchar",
+    "length": 64,
     "nullable": false,
     "isPrimaryKey": true,
+    "defaultValue": null,
+    "autoIncrement": false,
+    "ordinalPosition": 2,
     "comment": "订单号"
   }
+]
+```
+
+> 除 `name`/`dataType`/`nullable`/`isPrimaryKey` 外字段可选：`length`（varchar/char 长度）、`precision`/`scale`（numeric 精度/标度）、`defaultValue`（列默认值原始表达式，如 `now()`、`'active'`、`1`，null 表示无默认）、`autoIncrement`（serial/identity）、`ordinalPosition`（列序号从 1）、`comment`。
+
+### `foreign_keys` 结构（JSON）
+
+```jsonc
+[
+  {
+    "name": "fk_order_detail_order",
+    "columns": ["order_id"],
+    "refSchema": null,
+    "refTable": "order_main",
+    "refColumns": ["order_id"],
+    "onDelete": "CASCADE",
+    "onUpdate": null
+  }
+]
+```
+
+### `indexes` 结构（JSON）
+
+```jsonc
+[
+  { "name": "pk_order_main", "columns": ["order_id"], "unique": true, "primary": true },
+  { "name": "idx_order_no", "columns": ["order_no"], "unique": true, "primary": false }
 ]
 ```
 

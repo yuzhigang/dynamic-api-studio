@@ -179,18 +179,18 @@ dynamic-api-studio/
 │   │   ├── storage.ts
 │   │   └── logger.ts
 │   │
-│   ├── server/                     # 后端（Hono + Knex）
+│   ├── server/                     # 后端（Hono + Kysely 平台库 + Knex 业务库）
 │   │   ├── app.ts                  # Hono 实例，注册路由 + 中间件
-│   │   ├── index.ts                # @hono/vite 入口
-│   │   ├── context.ts              # Hono Context 扩展（Knex 实例、用户信息等）
+│   │   ├── index.ts                # @hono/vite 入口（dev）
+│   │   ├── node.ts                 # @hono/node-server 生产入口（build:server）
+│   │   ├── context.ts              # Hono Context 扩展（AppBindings：requestId 等）
 │   │   │
 │   │   ├── routes/                 # Hono 路由（薄层，调用 domain service）
 │   │   │   ├── api-definition.route.ts
-│   │   │   ├── data-source.route.ts
-│   │   │   ├── metadata.route.ts
+│   │   │   ├── data-source.route.ts   # 含 /:dataSourceId/schema（数据源 schema）
 │   │   │   ├── sql-analyze.route.ts    # POST /api/sql/analyze（编辑器分析）
 │   │   │   ├── api-test.route.ts       # POST /api/sql/test（测试执行）
-│   │   │   └── ...
+│   │   │   └── ...                      # 其余：global-variable / health / home-overview / project(-api/-variable) / sql-test / task
 │   │   │
 │   │   ├── analyzer/               # EnhancedSqlAnalyzer（设计文档 §20，跨域横向能力）
 │   │   │   ├── parser-wrapper.ts   # node-sql-parser 实例管理 + 方言配置
@@ -199,8 +199,15 @@ dynamic-api-studio/
 │   │   │   ├── alias-resolver.ts       # AST → 表别名映射
 │   │   │   ├── clause-detector.ts      # 光标位置 → 子句类型
 │   │   │   ├── reference-extractor.ts  # AST → 步骤间依赖引用
+│   │   │   ├── ast-variable-locator.ts # AST → 变量位置区间（AstVariableLocation）
+│   │   │   ├── render-from-plan.ts     # CompiledSqlPlan → 参数化 SQL（SQL Renderer）
 │   │   │   ├── validator.ts            # 变量合法性校验
+│   │   │   ├── types.ts                # analyzer 共享类型（CompiledSqlPlan / VariableInfo 等）
 │   │   │   └── index.ts
+│   │   │
+│   │   ├── expression/             # 表达式求值（local 变量依赖图 + 沙箱求值）
+│   │   │   ├── dependency-graph.ts     # local 变量表达式 → 依赖图
+│   │   │   └── expression-evaluator.ts # 沙箱内执行表达式（input/global/local 求值）
 │   │   │
 │   │   ├── workflow/                    # 执行引擎（可复用，被试运行与发布态调用复用）
 │   │   │   ├── workflow-runner.ts       # 编排循环 + 写事务 + assemble
@@ -217,13 +224,12 @@ dynamic-api-studio/
 │   │   │   ├── result-assembler.ts
 │   │   │   └── workflow-symbols.ts
 │   │   │
-│   │   ├── domains/                # 业务领域（service/repository/mapper）
+│   │   ├── domains/                # 业务领域（service / repository）
 │   │   │   ├── api-definition/
 │   │   │   ├── data-source/
-│   │   │   ├── metadata/
-│   │   │   │   ├── metadata.service.ts
-│   │   │   │   ├── metadata-provider.ts       # 元数据提供者接口
-│   │   │   │   └── database-introspector.ts   # 通用查询 + dialect provider 委托
+│   │   │   │   ├── data-source.repository.ts   # Kysely 持久化
+│   │   │   │   ├── data-source.service.ts
+│   │   │   │   └── data-source-schema.service.ts  # 数据源 schema（mock；未来真探测落 db_schema）
 │   │   │   ├── api-runtime/             # 发布态运行时（Part B）
 │   │   │   │   ├── published-router.ts  # 可热替换内层 OpenAPIHono + rebuild + /api/openapi
 │   │   │   │   ├── definition-to-openapi.ts
@@ -237,22 +243,22 @@ dynamic-api-studio/
 │   │   │   │   ├── auth-guard.ts        # authorize 401/403/放行
 │   │   │   │   ├── auth.route.ts        # POST /api/auth/login
 │   │   │   │   └── auth.contract.ts     # AuthDeps 缝 + login schema
-│   │   │   ├── function/
-│   │   │   ├── scheduled-task/
-│   │   │   ├── parameter/
-│   │   │   └── log/
+│   │   │   ├── global-variable/         # 全局变量（scope=global）
+│   │   │   ├── project/                 # 项目分组
+│   │   │   ├── project-variable/        # 项目变量（scope=project）
+│   │   │   └── scheduled-task/          # 定时任务
 │   │   │
-│   │   ├── infra/
-│   │   │   ├── db/
-│   │   │   │   ├── db.ts                      # Knex 实例管理 + 连接池
-│   │   │   │   ├── connection-manager.ts      # 按 dataSourceId 管理多数据源连接
-│   │   │   │   ├── schema.ts                  # 平台自有表 schema
-│   │   │   │   └── migrations/                # Knex migrations（平台表）
-│   │   │   ├── auth/
-│   │   │   ├── logger/
-│   │   │   └── error/
-│   │   │
-│   │   └── utils/
+│   │   └── infra/
+│   │   │   ├── db/                            # 平台元数据库（Kysely + PostgreSQL）
+│   │   │   │   ├── config.ts                  # 连接配置：.env 读取 + 校验
+│   │   │   │   ├── tables.ts                  # Kysely Database 类型（10 张表列定义）
+│   │   │   │   ├── db.ts                      # platformDb 单例（惰性连接池）
+│   │   │   │   ├── migrate.ts                 # 迁移运行器：up / status / rollback / make
+│   │   │   │   └── migrations/                # Kysely 迁移（平台表）
+│   │   │   ├── knex/
+│   │   │   │   └── knex-registry.ts           # 业务数据源多方言连接池（按 dataSourceId）
+│   │   │   └── errors/
+│   │   │       └── http-error.ts              # HttpError 类（带 HTTP 状态码）
 │   │
 │   ├── styles/
 │   │   ├── globals.css              # Tailwind 指令 + shadcn CSS 变量
@@ -281,9 +287,10 @@ dynamic-api-studio/
 
 执行引擎位于 `server/workflow/`，被试运行面板与（未来）发布态调度共用同一 `runWorkflow` 编排入口。
 
-### 数据库访问：Knex
+### 数据库访问：Kysely（平台元数据）+ Knex（业务数据源）
 
-- `server/infra/db/connection-manager.ts` 按 `dataSourceId` 管理多个 Knex 实例
+- 平台自身元数据（project/api/datasource/variable/function/log 等）用 **Kysely** + PostgreSQL 持久化，见 `server/infra/db/`（`platformDb` 单例 + Kysely 迁移，`pnpm db:migrate`）
+- 用户业务数据源用 **Knex**：`server/infra/knex/knex-registry.ts` 按 `dataSourceId` 管理多个 Knex 实例
 - 每个实例配置对应方言（`pg` / `mysql2` / `oracledb` / `mssql`）
 - SQL Renderer 统一输出 `?` 占位符 + params 数组，Knex 自动转换方言占位符
 - 元数据探测（`database-introspector.ts`）优先使用 Knex 查询 `information_schema`

@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { GlobalVariableRepository } from '@/server/domains/global-variable/global-variable.repository'
+import { platformDb } from '@/server/infra/db/db'
+import { dbAvailable, withRollback } from '@/server/infra/db/db-test-helpers'
+import { seedDemoData } from '@/server/infra/db/seed'
 import type { GlobalVariableDraft } from '@/shared/contracts/global-variable.contract'
 
 const singleDraft: GlobalVariableDraft = {
@@ -20,57 +23,71 @@ const listDraft: GlobalVariableDraft = {
 }
 
 describe('GlobalVariableRepository', () => {
-  it('seeds with at least one single and one list variable', () => {
-    const repository = new GlobalVariableRepository()
-    const all = repository.list()
+  beforeAll(async () => {
+    if (dbAvailable) await seedDemoData(platformDb)
+  })
+
+  it.skipIf(!dbAvailable)('seeds with at least one single and one list variable', async () => {
+    const repository = new GlobalVariableRepository(platformDb)
+    const all = await repository.list()
 
     expect(all.some((variable) => variable.kind === 'single')).toBe(true)
     expect(all.some((variable) => variable.kind === 'list')).toBe(true)
   })
 
-  it('creates a new variable with generated id and equal timestamps', () => {
-    const repository = new GlobalVariableRepository()
-    const before = repository.list().length
+  it.skipIf(!dbAvailable)('creates a new variable with generated id and equal timestamps', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new GlobalVariableRepository(trx)
+      const before = (await repository.list()).length
 
-    const created = repository.save(singleDraft)
+      const created = await repository.save(singleDraft)
 
-    expect(created.id).toBeTruthy()
-    expect(created.name).toBe('tenant_id')
-    expect(created.createdAt).toBe(created.updatedAt)
-    expect(repository.list()).toHaveLength(before + 1)
+      expect(created.id).toBeTruthy()
+      expect(created.name).toBe('tenant_id')
+      expect(created.createdAt).toBe(created.updatedAt)
+      expect(await repository.list()).toHaveLength(before + 1)
+    })
   })
 
-  it('updates an existing variable while preserving createdAt', () => {
-    const repository = new GlobalVariableRepository()
-    const created = repository.save(listDraft)
+  it.skipIf(!dbAvailable)('updates an existing variable while preserving createdAt', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new GlobalVariableRepository(trx)
+      const created = await repository.save(listDraft)
 
-    const updated = repository.save({ ...listDraft, id: created.id, label: '改名后' })
+      const updated = await repository.save({ ...listDraft, id: created.id, label: '改名后' })
 
-    expect(updated.id).toBe(created.id)
-    expect(updated.label).toBe('改名后')
-    expect(updated.createdAt).toBe(created.createdAt)
+      expect(updated.id).toBe(created.id)
+      expect(updated.label).toBe('改名后')
+      expect(updated.createdAt).toBe(created.createdAt)
+    })
   })
 
-  it('rejects a duplicate name on create', () => {
-    const repository = new GlobalVariableRepository()
-    repository.save(singleDraft)
+  it.skipIf(!dbAvailable)('rejects a duplicate name on create', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new GlobalVariableRepository(trx)
+      await repository.save(singleDraft)
 
-    expect(() => repository.save({ ...singleDraft })).toThrowError(/已存在/)
+      await expect(repository.save({ ...singleDraft })).rejects.toThrow(/已存在/)
+    })
   })
 
-  it('allows saving the same variable without triggering its own duplicate check', () => {
-    const repository = new GlobalVariableRepository()
-    const created = repository.save(singleDraft)
+  it.skipIf(!dbAvailable)('allows saving the same variable without triggering its own duplicate check', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new GlobalVariableRepository(trx)
+      const created = await repository.save(singleDraft)
 
-    expect(() => repository.save({ ...singleDraft, id: created.id })).not.toThrow()
+      await expect(repository.save({ ...singleDraft, id: created.id })).resolves.toBeTruthy()
+    })
   })
 
-  it('removes a variable', () => {
-    const repository = new GlobalVariableRepository()
-    const created = repository.save(singleDraft)
+  it.skipIf(!dbAvailable)('removes a variable', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repository = new GlobalVariableRepository(trx)
+      const created = await repository.save(singleDraft)
 
-    expect(repository.remove(created.id)).toBe(true)
-    expect(repository.get(created.id)).toBeUndefined()
-    expect(repository.remove(created.id)).toBe(false)
+      expect(await repository.remove(created.id)).toBe(true)
+      expect(await repository.get(created.id)).toBeUndefined()
+      expect(await repository.remove(created.id)).toBe(false)
+    })
   })
 })

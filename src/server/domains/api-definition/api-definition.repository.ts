@@ -1,182 +1,150 @@
-import type {
-  ApiDefinitionDraft,
-  ApiDefinitionSummary,
-} from '@/shared/contracts/api-definition.contract'
-import { createEmptyApiDefinition } from '@/shared/api-definition/create-empty-api-definition'
+import type { Kysely, Selectable } from 'kysely'
 
-const initialSummaries: ApiDefinitionSummary[] = [
-  {
-    id: 'api_order_query',
-    projectId: 'project_order',
-    name: '订单查询接口',
-    path: '/api/v1/order/query',
-    method: 'POST',
-    status: 'published',
-    updatedAt: '2026-06-27 14:30:00',
-  },
-  {
-    id: 'api_order_detail',
-    projectId: 'project_order',
-    name: '订单详情接口',
-    path: '/api/v1/order/detail',
-    method: 'GET',
-    status: 'published',
-    updatedAt: '2026-06-27 14:18:00',
-  },
-  {
-    id: 'api_customer_query',
-    projectId: 'project_order',
-    name: '客户查询接口',
-    path: '/api/v1/customer/query',
-    method: 'POST',
-    status: 'draft',
-    updatedAt: '2026-06-27 13:52:00',
-  },
-  {
-    id: 'api_product_query',
-    projectId: 'project_order',
-    name: '商品查询接口',
-    path: '/api/v1/product/query',
-    method: 'POST',
-    status: 'published',
-    updatedAt: '2026-06-27 13:40:00',
-  },
-  {
-    id: 'api_stock_query',
-    projectId: 'project_order',
-    name: '库存查询接口',
-    path: '/api/v1/stock/query',
-    method: 'POST',
-    status: 'draft',
-    updatedAt: '2026-06-27 12:35:00',
-  },
-  {
-    id: 'api_report_internal',
-    projectId: 'project_order',
-    name: '内部报表接口',
-    path: '/api/v1/report/internal',
-    method: 'GET',
-    status: 'published',
-    updatedAt: '2026-06-27 11:20:00',
-  },
-]
+import { createId } from '@/lib/id'
+import { jsonbArray } from '@/server/infra/db/repository-helpers'
+import type { ApiTable, Database } from '@/server/infra/db/tables'
+import type { ApiDefinitionDraft, ApiDefinitionSummary } from '@/shared/contracts/api-definition.contract'
+import type { ApiLocalVariable, RequestParam, SchemaField, WorkflowStep } from '@/shared/schemas/api-definition.schema'
 
-const initialDrafts: ApiDefinitionDraft[] = [
-  createEmptyApiDefinition({
-    id: 'api_order_query',
-    projectId: 'project_order',
-    status: 'published',
-    requireAuth: false,
-  }),
-  createEmptyApiDefinition({
-    id: 'api_order_detail',
-    projectId: 'project_order',
-    status: 'published',
-    requireAuth: false,
-    name: '订单详情接口',
-    path: '/api/v1/order/detail',
-    method: 'GET',
-    tags: ['订单', '详情'],
-    permissions: ['order.read'],
-    description: '按订单编号或订单 ID 查询订单详情。',
-  }),
-  createEmptyApiDefinition({
-    id: 'api_customer_query',
-    projectId: 'project_order',
-    name: '客户查询接口',
-    path: '/api/v1/customer/query',
-    method: 'POST',
-    tags: ['客户', '查询'],
-    permissions: ['customer.read'],
-    description: '按客户名称、手机号和会员等级查询客户信息。',
-  }),
-  createEmptyApiDefinition({
-    id: 'api_product_query',
-    projectId: 'project_order',
-    status: 'published',
-    requireAuth: false,
-    name: '商品查询接口',
-    path: '/api/v1/product/query',
-    method: 'POST',
-    tags: ['商品', '查询'],
-    permissions: ['product.read'],
-    description: '查询商品基础信息、SKU 和上下架状态。',
-  }),
-  createEmptyApiDefinition({
-    id: 'api_stock_query',
-    projectId: 'project_order',
-    name: '库存查询接口',
-    path: '/api/v1/stock/query',
-    method: 'POST',
-    tags: ['库存', '查询'],
-    permissions: ['stock.read'],
-    description: '查询仓库库存余量和锁定库存。',
-  }),
-  createEmptyApiDefinition({
-    id: 'api_report_internal',
-    projectId: 'project_order',
-    status: 'published',
-    requireAuth: false,
-    name: '内部报表接口',
-    path: '/api/v1/report/internal',
-    method: 'GET',
-    tags: ['报表', '内部接口'],
-    permissions: ['report.read'],
-    description: '内部运营报表查询接口。',
-  }),
-]
+type ApiRow = Selectable<ApiTable>
+type ApiSummaryRow = Pick<ApiRow, 'id' | 'project_id' | 'name' | 'path' | 'method' | 'status' | 'updated_at'>
 
+function rowToSummary(row: ApiSummaryRow): ApiDefinitionSummary {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    path: row.path,
+    method: row.method,
+    status: row.status,
+    updatedAt: row.updated_at.toISOString(),
+  }
+}
+
+function rowToDraft(row: ApiRow): ApiDefinitionDraft {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    status: row.status,
+    name: row.name,
+    path: row.path,
+    method: row.method,
+    tags: row.tags ?? [],
+    permissions: row.permissions ?? [],
+    requireAuth: row.require_auth,
+    description: row.description ?? undefined,
+    bodyContentType: row.body_content_type ?? 'json',
+    requestParams: (row.request_params ?? []) as RequestParam[],
+    responseSchema: (row.response_schema ?? []) as SchemaField[],
+    localVariables: (row.local_variables ?? []) as ApiLocalVariable[],
+    workflowSteps: (row.workflow_steps ?? []) as WorkflowStep[],
+  }
+}
+
+/**
+ * ApiDefinition repository —— Kysely 实现。
+ *
+ * 语义对齐内存版：
+ *  - `list(projectId)` 返回 Summary（不含大 jsonb，轻量）；`get` 返回完整 Draft；`listPublished` 返回所有已发布 Draft。
+ *  - `save` 为 upsert（onConflict id），返回 `{ id, status }`（与内存版一致的极简回执，非完整 Draft）。
+ *  - `isPathMethodUnique` 在已发布集合中查 (path, method)，可排除自身。
+ *
+ * jsonb 数组列（tags/permissions/request_params/response_schema/local_variables/workflow_steps）写库用 `jsonbArray`。
+ * FK：project_id→project.id（项目须存在）；UNIQUE(project_id, method, path) 由 DB 强制。
+ */
 export class ApiDefinitionRepository {
-  private summaries = new Map(initialSummaries.map((summary) => [summary.id, summary]))
-  private drafts = new Map(initialDrafts.map((draft) => [draft.id ?? draft.path, draft]))
+  constructor(private readonly db: Kysely<Database>) {}
 
-  list(projectId: string) {
-    return Array.from(this.summaries.values()).filter((summary) => summary.projectId === projectId)
+  async list(projectId: string): Promise<ApiDefinitionSummary[]> {
+    const rows = await this.db
+      .selectFrom('api')
+      .select(['id', 'project_id', 'name', 'path', 'method', 'status', 'updated_at'])
+      .where('project_id', '=', projectId)
+      .where('deleted_at', 'is', null)
+      .orderBy('updated_at', 'desc')
+      .orderBy('id', 'desc')
+      .execute()
+    return rows.map(rowToSummary)
   }
 
-  get(projectId: string, apiId: string) {
-    const draft = this.drafts.get(apiId)
-
-    if (draft?.projectId !== projectId) {
-      return undefined
-    }
-
-    return draft
+  async get(projectId: string, apiId: string): Promise<ApiDefinitionDraft | undefined> {
+    const row = await this.db
+      .selectFrom('api')
+      .selectAll()
+      .where('id', '=', apiId)
+      .where('project_id', '=', projectId)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return row ? rowToDraft(row) : undefined
   }
 
-  save(projectId: string, draft: ApiDefinitionDraft) {
-    const id = draft.id ?? `api_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    const nextDraft = {
-      ...draft,
-      id,
-      projectId,
-    }
-
-    this.drafts.set(id, nextDraft)
-
-    this.summaries.set(id, {
-      id,
-      projectId,
-      name: draft.name,
-      path: draft.path,
-      method: draft.method,
-      status: draft.status,
-      updatedAt: new Date().toISOString(),
-    })
-
-    return {
-      id,
-      status: draft.status,
-    }
+  async save(projectId: string, draft: ApiDefinitionDraft): Promise<{ id: string; status: string }> {
+    const id = draft.id ?? createId('api')
+    const now = new Date()
+    await this.db
+      .insertInto('api')
+      .values({
+        id,
+        project_id: projectId,
+        name: draft.name,
+        path: draft.path,
+        method: draft.method,
+        status: draft.status,
+        body_content_type: draft.bodyContentType,
+        tags: jsonbArray(draft.tags),
+        permissions: jsonbArray(draft.permissions),
+        require_auth: draft.requireAuth,
+        description: draft.description ?? null,
+        request_params: jsonbArray(draft.requestParams),
+        response_schema: jsonbArray(draft.responseSchema),
+        local_variables: jsonbArray(draft.localVariables),
+        workflow_steps: jsonbArray(draft.workflowSteps),
+        created_at: now,
+        updated_at: now,
+      })
+      .onConflict((oc) =>
+        oc.column('id').doUpdateSet({
+          project_id: projectId,
+          name: draft.name,
+          path: draft.path,
+          method: draft.method,
+          status: draft.status,
+          body_content_type: draft.bodyContentType,
+          tags: jsonbArray(draft.tags),
+          permissions: jsonbArray(draft.permissions),
+          require_auth: draft.requireAuth,
+          description: draft.description ?? null,
+          request_params: jsonbArray(draft.requestParams),
+          response_schema: jsonbArray(draft.responseSchema),
+          local_variables: jsonbArray(draft.localVariables),
+          workflow_steps: jsonbArray(draft.workflowSteps),
+          updated_at: now,
+        }),
+      )
+      .execute()
+    return { id, status: draft.status }
   }
 
-  listPublished(): ApiDefinitionDraft[] {
-    return Array.from(this.drafts.values()).filter((draft) => draft.status === 'published')
+  async listPublished(): Promise<ApiDefinitionDraft[]> {
+    const rows = await this.db
+      .selectFrom('api')
+      .selectAll()
+      .where('status', '=', 'published')
+      .where('deleted_at', 'is', null)
+      .execute()
+    return rows.map(rowToDraft)
   }
 
-  isPathMethodUnique(path: string, method: string, exceptId?: string): boolean {
-    return !this.listPublished().some(
-      (draft) => draft.path === path && draft.method === method && draft.id !== exceptId,
-    )
+  async isPathMethodUnique(path: string, method: ApiDefinitionDraft['method'], exceptId?: string): Promise<boolean> {
+    const baseQuery = this.db
+      .selectFrom('api')
+      .select('id')
+      .where('status', '=', 'published')
+      .where('path', '=', path)
+      .where('method', '=', method)
+      .where('deleted_at', 'is', null)
+    const query = exceptId ? baseQuery.where('id', '<>', exceptId) : baseQuery
+    const conflict = await query.executeTakeFirst()
+    return !conflict
   }
 }

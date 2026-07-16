@@ -41,7 +41,7 @@ const step = (overrides: Partial<WorkflowStep> = {}): WorkflowStep => ({
 describe('executeSql', () => {
   it('renders, executes via knex.raw, and returns the row array (multipleRows default)', async () => {
     const { knex, raw } = knexReturning({ rows: [{ id: 1 }, { id: 2 }] })
-    const getDataSource = vi.fn(() => pg)
+    const getDataSource = vi.fn(async () => pg)
     const knexRegistry = { getOrCreate: vi.fn(() => knex) } as unknown as Parameters<typeof executeSql>[2]['knexRegistry']
 
     const result = await executeSql(step(), ctxWith([]), { knexRegistry, getDataSource }, { symbols, planCache: fakePlanCache() })
@@ -52,7 +52,7 @@ describe('executeSql', () => {
 
   it('returns the first row when multipleRows is false', async () => {
     const { knex } = knexReturning({ rows: [{ id: 1 }, { id: 2 }] })
-    const getDataSource = vi.fn(() => pg)
+    const getDataSource = vi.fn(async () => pg)
     const knexRegistry = { getOrCreate: vi.fn(() => knex) } as unknown as Parameters<typeof executeSql>[2]['knexRegistry']
 
     const result = await executeSql(step({ multipleRows: false }), ctxWith([]), { knexRegistry, getDataSource }, { symbols, planCache: fakePlanCache() })
@@ -62,7 +62,7 @@ describe('executeSql', () => {
 
   it('returns null when multipleRows is false and there are no rows', async () => {
     const { knex } = knexReturning({ rows: [] })
-    const getDataSource = vi.fn(() => pg)
+    const getDataSource = vi.fn(async () => pg)
     const knexRegistry = { getOrCreate: vi.fn(() => knex) } as unknown as Parameters<typeof executeSql>[2]['knexRegistry']
 
     const result = await executeSql(step({ multipleRows: false }), ctxWith([]), { knexRegistry, getDataSource }, { symbols, planCache: fakePlanCache() })
@@ -74,7 +74,7 @@ describe('executeSql', () => {
     const { knex } = knexReturning({ rows: [{ id: 1 }] })
     const trxRaw = vi.fn().mockResolvedValue({ rows: [{ id: 9 }] })
     const trx = { raw: trxRaw } as unknown as Knex.Transaction
-    const getDataSource = vi.fn(() => pg)
+    const getDataSource = vi.fn(async () => pg)
     const knexRegistry = { getOrCreate: vi.fn(() => knex) } as unknown as Parameters<typeof executeSql>[2]['knexRegistry']
 
     const result = await executeSql(step(), ctxWith([]), { knexRegistry, getDataSource }, { symbols, planCache: fakePlanCache(), trx })
@@ -85,7 +85,7 @@ describe('executeSql', () => {
   })
 
   it('throws when the data source is missing', async () => {
-    const getDataSource = vi.fn(() => undefined)
+    const getDataSource = vi.fn(async () => undefined)
     const knexRegistry = { getOrCreate: vi.fn() } as unknown as Parameters<typeof executeSql>[2]['knexRegistry']
 
     await expect(executeSql(step(), ctxWith([]), { knexRegistry, getDataSource }, { symbols, planCache: fakePlanCache() })).rejects.toThrow(/数据源/)

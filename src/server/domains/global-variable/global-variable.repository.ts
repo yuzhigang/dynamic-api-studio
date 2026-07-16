@@ -1,73 +1,130 @@
-import type {
-  GlobalVariable,
-  GlobalVariableDraft,
-} from '@/shared/contracts/global-variable.contract'
+import type { Kysely, Selectable } from 'kysely'
 
-const now = '2026-06-28T00:00:00.000Z'
+import { createId } from '@/lib/id'
+import { jsonbArray } from '@/server/infra/db/repository-helpers'
+import type { Database, VariableTable } from '@/server/infra/db/tables'
+import type { GlobalVariable, GlobalVariableDraft } from '@/shared/contracts/global-variable.contract'
 
-const seedGlobalVariables: GlobalVariable[] = [
-  {
-    id: 'gv_default_page_size',
-    name: 'default_page_size',
-    label: '默认分页大小',
-    kind: 'single',
-    value: '20',
-    items: [],
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'gv_valid_order_status',
-    name: 'valid_order_status',
-    label: '有效订单状态',
-    kind: 'list',
-    value: '',
-    items: ['active', 'frozen', 'closed'],
-    createdAt: now,
-    updatedAt: now,
-  },
-]
+type VariableRow = Selectable<VariableTable>
 
+/** DB 行 → 契约。scope/project_id/description 为 DB 内部，不进 GlobalVariable 契约。 */
+function rowToGlobalVariable(row: VariableRow): GlobalVariable {
+  return {
+    id: row.id,
+    name: row.name,
+    label: row.label,
+    kind: row.kind,
+    value: row.value ?? '',
+    items: row.items ?? [],
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  }
+}
+
+/**
+ * GlobalVariable repository —— Kysely 实现（variable 表 scope='global'，project_id=NULL）。
+ *
+ * 语义对齐内存版：`save` 为 upsert（保留 created_at；single 写 value 清 items，list 写 items 清 value）；
+ * 重名校验在应用层（DB UNIQUE(scope,project_id,name) 对 project_id=NULL 视 NULL 互异，不强制全局唯一）；
+ * `remove` 软删除。jsonb 数组 items 写库前 `JSON.stringify`（见 tables.ts 注释）。
+ */
 export class GlobalVariableRepository {
-  private variables = new Map(seedGlobalVariables.map((variable) => [variable.id, variable]))
+  constructor(private readonly db: Kysely<Database>) {}
 
-  list() {
-    return Array.from(this.variables.values())
+  async list(): Promise<GlobalVariable[]> {
+    const rows = await this.db
+      .selectFrom('variable')
+      .selectAll()
+      .where('scope', '=', 'global')
+      .where('deleted_at', 'is', null)
+      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
+      .execute()
+    return rows.map(rowToGlobalVariable)
   }
 
-  get(variableId: string) {
-    return this.variables.get(variableId)
+  async get(variableId: string): Promise<GlobalVariable | undefined> {
+    const row = await this.db
+      .selectFrom('variable')
+      .selectAll()
+      .where('id', '=', variableId)
+      .where('scope', '=', 'global')
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return row ? rowToGlobalVariable(row) : undefined
   }
 
-  save(draft: GlobalVariableDraft) {
-    const timestamp = new Date().toISOString()
-    const id = draft.id ?? `gv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  async save(draft: GlobalVariableDraft): Promise<GlobalVariable> {
+    const id = draft.id ?? createId('gv')
+    await this.assertNameUnique(draft.name, id)
 
-    const duplicate = Array.from(this.variables.values()).find(
-      (variable) => variable.name === draft.name && variable.id !== id,
-    )
+    const existing = await this.get(id)
+    const value = draft.kind === 'single' ? draft.value : ''
+    const items = draft.kind === 'list' ? draft.items : []
 
-    if (duplicate) {
-      throw new Error(`变量名「${draft.name}」已存在`)
+    if (existing) {
+      await this.db
+        .updateTable('variable')
+        .set({
+          name: draft.name,
+          label: draft.label,
+          kind: draft.kind,
+          value,
+          items: jsonbArray(items),
+          updated_at: new Date(),
+        })
+        .where('id', '=', id)
+        .execute()
+    } else {
+      const now = new Date()
+      await this.db
+        .insertInto('variable')
+        .values({
+          id,
+          scope: 'global',
+          project_id: null,
+          name: draft.name,
+          label: draft.label,
+          kind: draft.kind,
+          value,
+          items: jsonbArray(items),
+          description: null,
+          created_at: now,
+          updated_at: now,
+        })
+        .execute()
     }
 
-    const existing = this.variables.get(id)
-    const variable: GlobalVariable = {
-      id,
-      name: draft.name,
-      label: draft.label,
-      kind: draft.kind,
-      value: draft.kind === 'single' ? draft.value : '',
-      items: draft.kind === 'list' ? draft.items : [],
-      createdAt: existing?.createdAt ?? timestamp,
-      updatedAt: timestamp,
+    const saved = await this.get(id)
+    if (!saved) {
+      throw new Error(`[global-variable] save 后未找到变量 ${id}`)
     }
-
-    this.variables.set(id, variable)
-    return variable
+    return saved
   }
 
-  remove(variableId: string) {
-    return this.variables.delete(variableId)
+  async remove(variableId: string): Promise<boolean> {
+    const existing = await this.get(variableId)
+    if (!existing) return false
+
+    await this.db
+      .updateTable('variable')
+      .set({ deleted_at: new Date(), updated_at: new Date() })
+      .where('id', '=', variableId)
+      .execute()
+    return true
+  }
+
+  private async assertNameUnique(name: string, id: string): Promise<void> {
+    const conflict = await this.db
+      .selectFrom('variable')
+      .select('id')
+      .where('scope', '=', 'global')
+      .where('name', '=', name)
+      .where('id', '<>', id)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    if (conflict) {
+      throw new Error(`变量名「${name}」已存在`)
+    }
   }
 }

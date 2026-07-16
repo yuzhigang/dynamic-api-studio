@@ -31,7 +31,7 @@ export async function liveHandler(
     else inputValues[p.name] = (validBody as Record<string, unknown>)[p.name]
   }
 
-  const globalValues = loadGlobalValues(def.projectId, services)
+  const globalValues = await loadGlobalValues(def.projectId, services)
   const run = await runWorkflow(def, inputValues, globalValues, deps, { onLog: (log) => console.log(log.step, log.status, log.durationMs) })
 
   if (run.status === 'success') return c.json(run.response, 200)

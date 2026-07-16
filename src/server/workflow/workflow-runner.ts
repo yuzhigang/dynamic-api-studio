@@ -18,7 +18,7 @@ import { toKnexConfig } from '@/server/workflow/datasource-config'
 
 export type WorkflowDeps = {
   knexRegistry: KnexRegistry
-  getDataSource: (id: string) => DataSource | undefined
+  getDataSource: (id: string) => Promise<DataSource | undefined>
   analyzer: EnhancedSqlAnalyzer
 }
 
@@ -48,7 +48,7 @@ export type WorkflowOptions = {
   /** Test seam: override per-step execution. Default dispatches by `step.kind`. */
   executeStep?: (step: WorkflowStep, context: VariableContext, deps: WorkflowDeps) => Promise<unknown>
   /** Test seam: override read/write classification. Default compiles the plan and reads statement type. */
-  classifyStep?: (step: WorkflowStep) => StatementClassification
+  classifyStep?: (step: WorkflowStep) => StatementClassification | Promise<StatementClassification>
   /** Test seam: override transaction open (default uses knex.transaction). */
   openTransaction?: (knex: import('knex').Knex) => Promise<import('knex').Knex.Transaction>
   onLog?: (log: { time: string; step: string; status: 'success' | 'failed'; durationMs: number }) => void
@@ -88,7 +88,10 @@ export async function runWorkflow(
 
   const sqlSteps = apiDefinition.workflowSteps.filter((s) => s.kind === 'sql-query')
   const classify = options.classifyStep ?? ((step) => classifySqlStep(step, deps, symbols, planCache))
-  const writeSteps = sqlSteps.filter((s) => classify(s) === 'write')
+  const writeSteps: WorkflowStep[] = []
+  for (const step of sqlSteps) {
+    if ((await classify(step)) === 'write') writeSteps.push(step)
+  }
   const writeStepIds = new Set(writeSteps.map((step) => step.id))
 
   let trx: Knex.Transaction | undefined
@@ -101,7 +104,7 @@ export async function runWorkflow(
       }
     }
     if (deps) {
-      const dataSource = deps.getDataSource(writeSteps[0].datasourceId ?? '')
+      const dataSource = await deps.getDataSource(writeSteps[0].datasourceId ?? '')
       if (dataSource) {
         const knex = deps.knexRegistry.getOrCreate(toKnexConfig(dataSource))
         trx = await (options.openTransaction ?? openTransaction)(knex)
@@ -177,14 +180,14 @@ async function dispatchStep(
   return executeJsTransform(step, context)
 }
 
-function classifySqlStep(
+async function classifySqlStep(
   step: WorkflowStep,
   deps: WorkflowDeps | undefined,
   symbols: ReturnType<typeof buildWorkflowSymbols>,
   planCache: PlanCache,
-): StatementClassification {
+): Promise<StatementClassification> {
   if (!deps || !step.datasourceId) return 'read'
-  const dataSource = deps.getDataSource(step.datasourceId)
+  const dataSource = await deps.getDataSource(step.datasourceId)
   if (!dataSource) return 'read'
   const plan = planCache.getOrCompile(step, symbols, { dataSource })
   const type = deps.analyzer.getStatementType(plan)

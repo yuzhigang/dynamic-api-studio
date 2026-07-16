@@ -7,7 +7,6 @@ import { dataSourceRoute } from '@/server/routes/data-source.route'
 import { globalVariableRoute } from '@/server/routes/global-variable.route'
 import { homeOverviewRoute } from '@/server/routes/home-overview.route'
 import { healthRoute } from '@/server/routes/health.route'
-import { metadataRoute } from '@/server/routes/metadata.route'
 import { projectApiRoute } from '@/server/routes/project-api.route'
 import { projectVariableRoute } from '@/server/routes/project-variable.route'
 import { projectRoute } from '@/server/routes/project.route'
@@ -30,15 +29,17 @@ app
   .route('/projects', projectVariableRoute)
   .route('/datasources', dataSourceRoute)
   .route('/global-variables', globalVariableRoute)
-  .route('/metadata', metadataRoute)
   .route('/sql', sqlAnalyzeRoute)
   .route('/sql', sqlTestRoute)
   .route('/tasks', taskRoute)
   .route('/auth', authApp)
 
 // Published API dispatch: unmatched /api/* delegates to the swappable inner OpenAPIHono.
-initPublishedRuntime()
-app.all('/*', (c) => getPublishedApp().fetch(c.req.raw, c.env as Record<string, unknown>))
+// 懒加载：首次 published 分发时从 DB 构建路由（幂等 initPublishedRuntime），避免模块加载期 TLA 触发 DB、保持离线 import 安全。
+app.all('/*', async (c) => {
+  await initPublishedRuntime()
+  return getPublishedApp().fetch(c.req.raw, c.env as Record<string, unknown>)
+})
 
 app.notFound((context) =>
   context.json(
