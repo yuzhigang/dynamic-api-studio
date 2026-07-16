@@ -91,6 +91,9 @@ export type DataSourceSchemaIndex = {
 /** 数据源 schema 的一张表/视图。 */
 export type DataSourceSchemaTable = {
   name: string
+  /** 库内 schema 名（PG schema 等）；单 schema 库可省。 */
+  schemaName?: string
+  objectType?: 'table' | 'view'
   comment?: string
   columns: DataSourceSchemaColumn[]
   foreignKeys?: DataSourceSchemaForeignKey[]

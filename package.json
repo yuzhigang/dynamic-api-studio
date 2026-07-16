@@ -46,6 +46,7 @@
     "dotenv": "^17.4.2",
     "hono": "^4.8.2",
     "knex": "^3.1.0",
+    "knex-schema-inspector": "^3.1.0",
     "kysely": "^0.29.3",
     "lucide-react": "^0.468.0",
     "node-sql-parser": "^5.3.12",

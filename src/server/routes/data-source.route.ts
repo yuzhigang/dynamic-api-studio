@@ -5,12 +5,13 @@ import { platformDb } from '@/server/infra/db/db'
 import { DataSourceRepository } from '@/server/domains/data-source/data-source.repository'
 import { DataSourceSchemaService } from '@/server/domains/data-source/data-source-schema.service'
 import { DataSourceService } from '@/server/domains/data-source/data-source.service'
+import { KnexRegistry } from '@/server/infra/knex/knex-registry'
 import { dataSourceDraftSchema } from '@/shared/contracts/data-source.contract'
 
 export const dataSourceRepository = new DataSourceRepository(platformDb)
 
 const service = new DataSourceService(dataSourceRepository)
-const schemaService = new DataSourceSchemaService()
+const schemaService = new DataSourceSchemaService(dataSourceRepository, new KnexRegistry(), platformDb)
 
 export const dataSourceRoute = new Hono()
   .get('/', async (context) => context.json(await service.list()))
@@ -20,8 +21,8 @@ export const dataSourceRoute = new Hono()
   .post('/test-connection', zValidator('json', dataSourceDraftSchema), (context) =>
     context.json(service.testConnection(context.req.valid('json'))),
   )
-  .get('/:dataSourceId/schema', (context) =>
-    context.json(schemaService.getDataSourceSchema(context.req.param('dataSourceId'))),
+  .get('/:dataSourceId/schema', async (context) =>
+    context.json(await schemaService.getDataSourceSchema(context.req.param('dataSourceId'))),
   )
   .get('/:dataSourceId', async (context) => {
     const dataSource = await service.get(context.req.param('dataSourceId'))
