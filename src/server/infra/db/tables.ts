@@ -52,7 +52,7 @@ type ExecutionStatus = 'success' | 'failed' | 'timeout' | 'running'
 /** schedule_task_log.trigger */
 type ScheduleTrigger = 'auto' | 'manual'
 
-/** 公共审计字段（project / api / json_schema / db_source / variable / function / schedule_task）。 */
+/** 公共审计字段（project / api / json_schema / db_source / variable / custom_function / schedule_task）。 */
 export interface AuditColumns {
   created_at: Generated<Date>
   updated_at: Generated<Date>
@@ -161,16 +161,17 @@ export interface VariableTable extends AuditColumns {
   description: string | null
 }
 
-/** 7. function — 可复用函数。 */
-export interface FunctionTable extends AuditColumns {
+/** 7. custom_function — 可复用函数。 */
+export interface CustomFunctionTable extends AuditColumns {
   id: string
   project_id: string | null
+  scope: 'global' | 'project'
   name: string
   label: string | null
   language: Generated<string>
-  params: unknown[] | null
+  inputSchema: unknown[] | null
   body: string
-  return_type: string | null
+  outputSchema: unknown[] | null
   description: string | null
 }
 
@@ -232,7 +233,7 @@ export interface Database {
   db_source: DbSourceTable
   db_schema: DbSchemaTable
   variable: VariableTable
-  function: FunctionTable
+  custom_function: CustomFunctionTable
   api_invocation_log: ApiInvocationLogTable
   schedule_task: ScheduleTaskTable
   schedule_task_log: ScheduleTaskLogTable

@@ -58,7 +58,7 @@ db_source 1───* schedule_task
               schedule_task 1───* schedule_task_log
 
 project 0..1───* variable                 (scope=project 时关联 project；scope=global 时 project_id=NULL)
-project 0..1───* function                 (可项目内或全局)
+project 0..1───* custom_function                 (可项目内或全局)
 ```
 
 ### 表清单
@@ -71,7 +71,7 @@ project 0..1───* function                 (可项目内或全局)
 | 4 | `db_source` | 业务数据源连接配置 | ✓ |
 | 5 | `db_schema` | 数据源元数据缓存（表/列） | ✗（缓存） |
 | 6 | `variable` | 变量（scope=global / project） | ✓ |
-| 7 | `function` | 可复用函数 | ✓ |
+| 7 | `custom_function` | 可复用函数 | ✓ |
 | 8 | `api_invocation_log` | API 调用日志（kind 区分 test/invoke） | ✗（日志） |
 | 9 | `schedule_task` | 定时任务 | ✓ |
 | 10 | `schedule_task_log` | 定时任务执行日志 | ✗（日志） |
@@ -303,7 +303,7 @@ API 元信息。请求/响应结构通过 FK 引用可复用的 `json_schema` �
 
 ---
 
-## 8. function — 可复用函数
+## 8. custom_function — 可复用函数
 
 供 JS 转换步骤或表达式复用的命名函数。
 
@@ -313,14 +313,13 @@ API 元信息。请求/响应结构通过 FK 引用可复用的 `json_schema` �
 | `project_id` | VARCHAR(36) | NULL, FK→project.id | 归属项目；NULL 表示全局函数 |
 | `name` | VARCHAR(64) | NOT NULL | 函数名（调用标识） |
 | `label` | VARCHAR(128) | NULL | 显示名 |
+| `scope` | VARCHAR(16) | NOT NULL | `global` \| `project` |
 | `language` | VARCHAR(16) | NOT NULL, DEFAULT `'javascript'` | 实现语言 |
-| `params` | JSON | NULL | 形参定义数组 |
+| `inputSchema` | JSON | NULL | 形参定义数组 |
 | `body` | TEXT | NOT NULL | 函数体/脚本 |
-| `return_type` | VARCHAR(32) | NULL | 返回类型标注 |
+| `outputSchema` | JSON | NULL | 返回类型标注 |
 | `description` | TEXT | NULL | 描述 |
 | `created_at` / `updated_at` / `created_by` / `updated_by` / `deleted_at` | | | 公共审计字段 |
-
-**索引**：`INDEX(project_id)`、`UNIQUE(project_id, name)`、`INDEX(deleted_at)`
 
 ---
 
