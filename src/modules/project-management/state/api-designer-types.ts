@@ -23,6 +23,7 @@ export type ApiDesignerAction =
     }
   | { type: 'set-tags'; value: string[] }
   | { type: 'set-permissions'; value: string[] }
+  | { type: 'set-require-auth'; value: boolean }
   | { type: 'update-request-param'; id: string; patch: Partial<RequestParam> }
   | { type: 'add-request-param'; location: RequestParam['location']; afterId?: string }
   | { type: 'remove-request-param'; id: string }

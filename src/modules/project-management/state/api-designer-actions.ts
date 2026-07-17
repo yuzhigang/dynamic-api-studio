@@ -23,6 +23,9 @@ export const apiDesignerActions = {
   setPermissions(value: string[]): ApiDesignerAction {
     return { type: 'set-permissions', value }
   },
+  setRequireAuth(value: boolean): ApiDesignerAction {
+    return { type: 'set-require-auth', value }
+  },
   updateRequestParam(id: string, patch: Partial<RequestParam>): ApiDesignerAction {
     return { type: 'update-request-param', id, patch }
   },

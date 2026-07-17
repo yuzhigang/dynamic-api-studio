@@ -161,6 +161,14 @@ export function apiDesignerReducer(
           permissions: action.value,
         },
       }
+    case 'set-require-auth':
+      return {
+        ...state,
+        apiDefinition: {
+          ...state.apiDefinition,
+          requireAuth: action.value,
+        },
+      }
     case 'update-request-param':
       return {
         ...state,

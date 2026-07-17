@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { CompactField } from '@/components/common/compact-field'
 import { ApiMethodSelect } from '@/modules/project-management/components/basic-info/api-method-select'
@@ -60,6 +61,20 @@ export function ApiBasicInfoSection() {
             value={api.permissions}
             onChange={(value) => dispatch(apiDesignerActions.setPermissions(value))}
           />
+        </CompactField>
+        <CompactField htmlFor="api-require-auth" label="鉴权">
+          <div className="flex items-center gap-2 pt-1.5">
+            <Checkbox
+              id="api-require-auth"
+              checked={api.requireAuth}
+              onCheckedChange={(checked) =>
+                dispatch(apiDesignerActions.setRequireAuth(checked === true))
+              }
+            />
+            <label htmlFor="api-require-auth" className="text-xs text-slate-700">
+              需要鉴权
+            </label>
+          </div>
         </CompactField>
         {/* <CompactField htmlFor="api-description" label="描述">
           <Textarea

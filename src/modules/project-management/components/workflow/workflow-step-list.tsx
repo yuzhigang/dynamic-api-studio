@@ -12,10 +12,8 @@ export function WorkflowStepList() {
       {state.apiDefinition.workflowSteps.map((step, index) => (
         <WorkflowStepCard
           key={step.id}
-          stepId={step.id}
+          step={step}
           index={index}
-          title={step.title}
-          role={step.role}
         >
           {step.kind === 'sql-query' ? <SqlQueryStepCard step={step} /> : null}
           {step.kind === 'js-transform' ? <JsTransformStepCard step={step} /> : null}
