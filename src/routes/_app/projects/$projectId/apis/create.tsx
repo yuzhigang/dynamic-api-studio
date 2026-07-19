@@ -1,7 +1,7 @@
 import { Navigate, useParams } from '@tanstack/react-router'
 
 import { createId } from '@/lib/id'
-import { readApiDraft } from '@/modules/project-management/utils/api-draft-storage'
+import { readApiDraft } from '@/modules/projects/utils/api-draft-storage'
 
 export function CreateProjectApiRouteComponent() {
   const { projectId = '' } = useParams({ strict: false }) as { projectId?: string }

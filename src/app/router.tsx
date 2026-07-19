@@ -10,28 +10,23 @@ import { AppErrorBoundary } from '@/app/app-error-boundary'
 import { AppRouteComponent } from '@/routes/_app'
 import { RootRouteComponent } from '@/routes/__root'
 import { CreateProjectApiRouteComponent } from '@/routes/_app/projects/$projectId/apis/create'
-import { EditProjectApiRouteComponent } from '@/routes/_app/projects/$projectId/apis/$apiId/edit'
-import { ProjectApiDetailRouteComponent } from '@/routes/_app/projects/$projectId/apis/$apiId'
-import { ProjectApiTestsRouteComponent } from '@/routes/_app/projects/$projectId/apis/$apiId/tests'
-import { ProjectApiInvocationsRouteComponent } from '@/routes/_app/projects/$projectId/apis/$apiId/invocations'
 import { ProjectApiVariablesRouteComponent } from '@/routes/_app/projects/$projectId/apis/$apiId/variables'
-import { ProjectDetailRouteComponent } from '@/routes/_app/projects/$projectId'
-import { ProjectSettingsRouteComponent } from '@/routes/_app/projects/$projectId/settings'
-import { HomeOverviewRouteComponent } from '@/routes/_app/home'
-import { InvocationLogRouteComponent } from '@/routes/_app/invocation-logs'
-import { ProjectListRouteComponent } from '@/routes/_app/projects'
 import { DataSourceIndexRouteComponent } from '@/routes/_app/datasources'
-import { DataSourceDetailRouteComponent } from '@/routes/_app/datasources/$dataSourceId'
-import { DataSourcePage } from '@/modules/data-source/pages/data-source-page'
-import { TasksRouteComponent } from '@/routes/_app/tasks'
-import { TaskDetailRouteComponent } from '@/routes/_app/tasks/$taskId'
-import { TaskLogsRouteComponent } from '@/routes/_app/tasks/$taskId/logs'
-
-import { SettingsPage } from '@/modules/settings/pages/settings-page'
 import { SettingsIndexRouteComponent } from '@/routes/_app/settings'
-import { SettingsGeneralRouteComponent } from '@/routes/_app/settings/general'
-import { SettingsGlobalVariablesRouteComponent } from '@/routes/_app/settings/global-variables'
-import { SettingsFunctionsRouteComponent } from '@/routes/_app/settings/functions'
+import { SettingsCustomFunctionsRouteComponent } from '@/routes/_app/settings/custom-functions'
+
+import { DataSourcePage } from '@/modules/data-source/pages/data-source-page'
+import { DataSourceDetailPage } from '@/modules/data-source/pages/data-source-detail-page'
+import { HomeOverviewPage } from '@/modules/home/pages/home-overview-page'
+import { InvocationLogPage } from '@/modules/invocation-log/pages/invocation-log-page'
+import { TaskWorkspacePage } from '@/modules/scheduled-task'
+import { EditApiPage } from '@/modules/projects/pages/edit-api-page'
+import { ProjectDetailPage } from '@/modules/projects/pages/project-detail-page'
+import { ProjectListPage } from '@/modules/projects/pages/project-list-page'
+import { ProjectSettingsPage } from '@/modules/projects/pages/project-settings-page'
+import { SettingsPage } from '@/modules/settings/pages/settings-page'
+import { EditorAppearanceSettings } from '@/modules/settings/components/general/editor-appearance-settings'
+import { GlobalVariablesSection } from '@/modules/settings/components/global-variables/global-variables-section'
 
 const rootRoute = createRootRoute({
   component: RootRouteComponent,
@@ -53,13 +48,13 @@ const homeRoute = createRoute({
 const homeOverviewRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'home',
-  component: HomeOverviewRouteComponent,
+  component: HomeOverviewPage,
 })
 
 const invocationLogsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'invocation-logs',
-  component: InvocationLogRouteComponent,
+  component: InvocationLogPage,
 })
 
 const dataSourcesRoute = createRoute({
@@ -77,7 +72,7 @@ const dataSourceIndexRoute = createRoute({
 const dataSourceDetailRoute = createRoute({
   getParentRoute: () => dataSourcesRoute,
   path: '$dataSourceId',
-  component: DataSourceDetailRouteComponent,
+  component: DataSourceDetailPage,
 })
 
 const projectsRoute = createRoute({
@@ -95,25 +90,25 @@ const tasksRoute = createRoute({
 const tasksIndexRoute = createRoute({
   getParentRoute: () => tasksRoute,
   path: '/',
-  component: TasksRouteComponent,
+  component: TaskWorkspacePage,
 })
 
 const taskDetailRoute = createRoute({
   getParentRoute: () => tasksRoute,
   path: '$taskId',
-  component: TaskDetailRouteComponent,
+  component: TaskWorkspacePage,
 })
 
 const taskLogsRoute = createRoute({
   getParentRoute: () => tasksRoute,
   path: '$taskId/logs',
-  component: TaskLogsRouteComponent,
+  component: TaskWorkspacePage,
 })
 
 const projectListRoute = createRoute({
   getParentRoute: () => projectsRoute,
   path: '/',
-  component: ProjectListRouteComponent,
+  component: ProjectListPage,
 })
 
 const projectRoute = createRoute({
@@ -125,13 +120,13 @@ const projectRoute = createRoute({
 const projectDetailRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: '/',
-  component: ProjectDetailRouteComponent,
+  component: ProjectDetailPage,
 })
 
 const projectSettingsRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: 'settings',
-  component: ProjectSettingsRouteComponent,
+  component: ProjectSettingsPage,
 })
 
 const projectApisRoute = createRoute({
@@ -149,25 +144,25 @@ const createProjectApiRoute = createRoute({
 const projectApiDetailRoute = createRoute({
   getParentRoute: () => projectApisRoute,
   path: '$apiId',
-  component: ProjectApiDetailRouteComponent,
+  component: ProjectDetailPage,
 })
 
 const projectApiTestsRoute = createRoute({
   getParentRoute: () => projectApisRoute,
   path: '$apiId/tests',
-  component: ProjectApiTestsRouteComponent,
+  component: ProjectDetailPage,
 })
 
 const projectApiTestDetailRoute = createRoute({
   getParentRoute: () => projectApisRoute,
   path: '$apiId/tests/$testId',
-  component: ProjectApiTestsRouteComponent,
+  component: ProjectDetailPage,
 })
 
 const projectApiInvocationsRoute = createRoute({
   getParentRoute: () => projectApisRoute,
   path: '$apiId/invocations',
-  component: ProjectApiInvocationsRouteComponent,
+  component: ProjectDetailPage,
 })
 
 const projectApiVariablesRoute = createRoute({
@@ -179,7 +174,7 @@ const projectApiVariablesRoute = createRoute({
 const editProjectApiRoute = createRoute({
   getParentRoute: () => projectApisRoute,
   path: '$apiId/edit',
-  component: EditProjectApiRouteComponent,
+  component: EditApiPage,
 })
 
 const settingsRoute = createRoute({
@@ -197,19 +192,19 @@ const settingsIndexRoute = createRoute({
 const settingsGeneralRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'general',
-  component: SettingsGeneralRouteComponent,
+  component: EditorAppearanceSettings,
 })
 
 const settingsGlobalVariablesRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: 'global-variables',
-  component: SettingsGlobalVariablesRouteComponent,
+  component: GlobalVariablesSection,
 })
 
 const settingsFunctionsRoute = createRoute({
   getParentRoute: () => settingsRoute,
-  path: 'functions',
-  component: SettingsFunctionsRouteComponent,
+  path: 'custom-functions',
+  component: SettingsCustomFunctionsRouteComponent,
 })
 
 const routeTree = rootRoute.addChildren([
