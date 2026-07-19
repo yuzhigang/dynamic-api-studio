@@ -13,6 +13,11 @@ export type {
 export {
   dataSourceDraftSchema,
   dataSourceSchema,
+  dataSourceSchemaColumnSchema,
+  dataSourceSchemaForeignKeySchema,
+  dataSourceSchemaIndexSchema,
+  dataSourceSchemaTableSchema,
+  dataSourceSchemaSchema,
   dialectSchema,
   testConnectionResultSchema,
 } from '@/shared/schemas/data-source.schema'

@@ -10,6 +10,7 @@ import { useApiDefinitionListQuery } from '@/modules/projects/hooks/use-api-defi
 import { ProjectApiSidebar } from '@/modules/projects/components/project-workspace/project-api-sidebar'
 import { ProjectApiVariablesTab } from '@/modules/projects/components/project-workspace/project-api-variables-tab'
 import { ProjectSettingsForm } from '@/modules/projects/components/project-form/project-settings-form'
+import { ProjectDbSchemaSection } from '@/modules/projects/components/project-db-schema/project-db-schema-section'
 import { useProjectQuery } from '@/modules/projects/hooks/use-project-query'
 
 export function ProjectSettingsPage() {
@@ -80,6 +81,8 @@ export function ProjectSettingsPage() {
                         <ProjectApiVariablesTab projectId={project.id} />
                       </CardContent>
                     </Card>
+
+                    <ProjectDbSchemaSection projectId={project.id} />
                   </div>
                 </div>
               </ResizablePanel>
