@@ -1,5 +1,5 @@
 import { AppPage } from '@/layouts/app-shell/app-page'
-import { InvocationLogSection } from '@/modules/home/components/invocation-log-section'
+import { InvocationLogSection } from '@/modules/invocation-log/components/invocation-log-section'
 import { MetricGrid } from '@/modules/home/components/metric-grid'
 import { RecentProjectsSection } from '@/modules/home/components/recent-projects-section'
 import { useHomeOverviewQuery } from '@/modules/home/hooks/use-home-overview-query'

@@ -2,8 +2,8 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { AppPage } from '@/layouts/app-shell/app-page'
-import { InvocationLogPagination } from '@/modules/home/components/invocation-log-pagination'
-import { useInvocationLogsQuery } from '@/modules/home/hooks/use-invocation-logs-query'
+import { InvocationLogPagination } from '@/modules/invocation-log/components/invocation-log-pagination'
+import { useInvocationLogsQuery } from '@/modules/invocation-log/hooks/use-invocation-logs-query'
 import { InvocationLogFilterBar, InvocationLogTable } from '@/modules/invocation-log'
 import type { InvocationLogFilters } from '@/modules/invocation-log'
 

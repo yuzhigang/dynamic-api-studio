@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
-import { getInvocationLogs } from '@/modules/home/services/invocation-log.api'
-import { invocationLogQueryKeys } from '@/modules/home/services/invocation-log-query-keys'
+import { getInvocationLogs } from '@/modules/invocation-log/services/invocation-log.api'
+import { invocationLogQueryKeys } from '@/modules/invocation-log/services/invocation-log-query-keys'
 import type { InvocationLogFilters } from '@/modules/invocation-log'
 
 export function useInvocationLogsQuery(

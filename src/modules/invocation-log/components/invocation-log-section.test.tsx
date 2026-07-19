@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { InvocationLogSection } from './invocation-log-section'
 
-vi.mock('@/modules/home/hooks/use-invocation-logs-query', () => ({
+vi.mock('@/modules/invocation-log/hooks/use-invocation-logs-query', () => ({
   useInvocationLogsQuery: vi.fn(),
 }))
 
-import { useInvocationLogsQuery } from '@/modules/home/hooks/use-invocation-logs-query'
+import { useInvocationLogsQuery } from '@/modules/invocation-log/hooks/use-invocation-logs-query'
 
 const mockedUseQuery = vi.mocked(useInvocationLogsQuery)
 

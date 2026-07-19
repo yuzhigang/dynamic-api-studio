@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { InvocationLogPagination } from '@/modules/home/components/invocation-log-pagination'
-import { useInvocationLogsQuery } from '@/modules/home/hooks/use-invocation-logs-query'
+import { InvocationLogPagination } from '@/modules/invocation-log/components/invocation-log-pagination'
+import { useInvocationLogsQuery } from '@/modules/invocation-log/hooks/use-invocation-logs-query'
 import { InvocationLogTable } from '@/modules/invocation-log'
 
 export function InvocationLogSection() {
