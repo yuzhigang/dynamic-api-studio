@@ -11,6 +11,7 @@ import { ProjectApiSidebar } from '@/modules/projects/components/project-workspa
 import { ProjectApiVariablesTab } from '@/modules/projects/components/project-workspace/project-api-variables-tab'
 import { ProjectSettingsForm } from '@/modules/projects/components/project-form/project-settings-form'
 import { ProjectDbSchemaSection } from '@/modules/projects/components/project-db-schema/project-db-schema-section'
+import { ProjectCustomFunctionsSection } from '@/modules/projects/components/custom-function/project-custom-functions-section'
 import { useProjectQuery } from '@/modules/projects/hooks/use-project-query'
 
 export function ProjectSettingsPage() {
@@ -83,6 +84,8 @@ export function ProjectSettingsPage() {
                     </Card>
 
                     <ProjectDbSchemaSection projectId={project.id} />
+
+                    <ProjectCustomFunctionsSection projectId={project.id} />
                   </div>
                 </div>
               </ResizablePanel>
