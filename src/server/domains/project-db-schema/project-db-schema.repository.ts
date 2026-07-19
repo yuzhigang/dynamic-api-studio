@@ -31,6 +31,16 @@ function rowToProjectDbSchema(row: DbSchemaRow): ProjectDbSchema {
 export class ProjectDbSchemaRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
+  async get(projectId: string, dbSchemaId: string): Promise<ProjectDbSchema | undefined> {
+    const row = await this.db
+      .selectFrom('db_schema')
+      .selectAll()
+      .where('id', '=', dbSchemaId)
+      .where('project_id', '=', projectId)
+      .executeTakeFirst()
+    return row ? rowToProjectDbSchema(row) : undefined
+  }
+
   async listByProject(projectId: string): Promise<ProjectDbSchema[]> {
     const rows = await this.db
       .selectFrom('db_schema')

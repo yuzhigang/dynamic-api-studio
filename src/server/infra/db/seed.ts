@@ -346,6 +346,7 @@ export async function seedDemoData(db: Kysely<Database>): Promise<void> {
           color: project.color,
           status: project.status,
           api_count: project.api_count,
+          db_source_id: project.db_source_id,
           updated_at: project.updated_at,
         }),
       )

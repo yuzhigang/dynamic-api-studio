@@ -81,6 +81,8 @@ export const apiDefinitionDraftSchema = z.object({
   requireAuth: z.boolean().default(true),
   description: z.string().optional(),
   bodyContentType: z.enum(['x-www-form-urlencoded', 'json', 'form-data']),
+  requestSchemaId: z.string().optional(),
+  responseSchemaId: z.string().optional(),
   requestParams: z.array(requestParamSchema),
   responseSchema: z.array(schemaFieldSchema),
   localVariables: z.array(apiLocalVariableSchema).default([]),

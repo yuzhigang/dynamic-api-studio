@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ApiDefinitionRepository } from '@/server/domains/api-definition/api-definition.repository'
 import { platformDb } from '@/server/infra/db/db'
-import { dbAvailable } from '@/server/infra/db/db-test-helpers'
+import { dbAvailable, withRollback } from '@/server/infra/db/db-test-helpers'
 import { seedDemoData } from '@/server/infra/db/seed'
 import { apiDefinitionDraftSchema } from '@/shared/contracts/api-definition.contract'
+import { createId } from '@/lib/id'
 
 describe('ApiDefinitionRepository published lookups', () => {
   const repository = new ApiDefinitionRepository(platformDb)
@@ -47,5 +48,61 @@ describe('ApiDefinitionRepository published lookups', () => {
       localVariables: [], workflowSteps: [],
     })
     expect(parsed.requireAuth).toBe(true)
+  })
+
+  it.skipIf(!dbAvailable)('persists request_schema_id and response_schema_id', async () => {
+    await withRollback(platformDb, async (trx) => {
+      const repo = new ApiDefinitionRepository(trx)
+      const requestSchemaId = createId('json_schema')
+      const responseSchemaId = createId('json_schema')
+
+      await trx
+        .insertInto('json_schema')
+        .values([
+          {
+            id: requestSchemaId,
+            project_id: 'project_crm',
+            name: 'request-schema',
+            kind: 'request',
+            content: {},
+            description: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+          {
+            id: responseSchemaId,
+            project_id: 'project_crm',
+            name: 'response-schema',
+            kind: 'response',
+            content: {},
+            description: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ])
+        .execute()
+
+      const saved = await repo.save('project_crm', {
+        projectId: 'project_crm',
+        status: 'draft',
+        name: 'schema-link-test',
+        path: `/schema-link-test-${createId('test').slice(-8)}`,
+        method: 'GET',
+        tags: [],
+        permissions: [],
+        requireAuth: true,
+        bodyContentType: 'json',
+        requestSchemaId,
+        responseSchemaId,
+        requestParams: [],
+        responseSchema: [],
+        localVariables: [],
+        workflowSteps: [],
+      })
+
+      const found = await repo.get('project_crm', saved.id)
+      expect(found?.requestSchemaId).toBe(requestSchemaId)
+      expect(found?.responseSchemaId).toBe(responseSchemaId)
+    })
   })
 })

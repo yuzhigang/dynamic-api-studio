@@ -34,6 +34,8 @@ function rowToDraft(row: ApiRow): ApiDefinitionDraft {
     requireAuth: row.require_auth,
     description: row.description ?? undefined,
     bodyContentType: row.body_content_type ?? 'json',
+    requestSchemaId: row.request_schema_id ?? undefined,
+    responseSchemaId: row.response_schema_id ?? undefined,
     requestParams: (row.request_params ?? []) as RequestParam[],
     responseSchema: (row.response_schema ?? []) as SchemaField[],
     localVariables: (row.local_variables ?? []) as ApiLocalVariable[],
@@ -91,6 +93,8 @@ export class ApiDefinitionRepository {
         method: draft.method,
         status: draft.status,
         body_content_type: draft.bodyContentType,
+        request_schema_id: draft.requestSchemaId ?? null,
+        response_schema_id: draft.responseSchemaId ?? null,
         tags: jsonbArray(draft.tags),
         permissions: jsonbArray(draft.permissions),
         require_auth: draft.requireAuth,
@@ -110,6 +114,8 @@ export class ApiDefinitionRepository {
           method: draft.method,
           status: draft.status,
           body_content_type: draft.bodyContentType,
+          request_schema_id: draft.requestSchemaId ?? null,
+          response_schema_id: draft.responseSchemaId ?? null,
           tags: jsonbArray(draft.tags),
           permissions: jsonbArray(draft.permissions),
           require_auth: draft.requireAuth,
@@ -133,6 +139,18 @@ export class ApiDefinitionRepository {
       .where('deleted_at', 'is', null)
       .execute()
     return rows.map(rowToDraft)
+  }
+
+  async existsByPathMethod(projectId: string, path: string, method: ApiDefinitionDraft['method']): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('api')
+      .select('id')
+      .where('project_id', '=', projectId)
+      .where('path', '=', path)
+      .where('method', '=', method)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirst()
+    return !!row
   }
 
   async isPathMethodUnique(path: string, method: ApiDefinitionDraft['method'], exceptId?: string): Promise<boolean> {

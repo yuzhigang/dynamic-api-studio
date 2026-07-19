@@ -1,6 +1,16 @@
 import { useState } from 'react'
 
-import { Database, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Database, RefreshCw, Trash2, Wand2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +36,8 @@ import {
   useProjectDbSchemaSourceObjectsQuery,
   useSyncProjectDbSchemaMutation,
 } from '@/modules/projects/hooks/use-project-db-schema'
+import { useGenerateCrudMutation } from '@/modules/projects/hooks/use-generate-crud'
+import type { ProjectDbSchema } from '@/shared/contracts/project-db-schema.contract'
 
 type ProjectDbSchemaSectionProps = {
   projectId: string
@@ -33,10 +45,13 @@ type ProjectDbSchemaSectionProps = {
 
 export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProps) {
   const [syncOpen, setSyncOpen] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const [selectedSchema, setSelectedSchema] = useState<ProjectDbSchema | null>(null)
   const listQuery = useProjectDbSchemaListQuery(projectId)
   const sourceObjectsQuery = useProjectDbSchemaSourceObjectsQuery(projectId)
   const syncMutation = useSyncProjectDbSchemaMutation(projectId)
   const deleteMutation = useDeleteProjectDbSchemaMutation(projectId)
+  const generateMutation = useGenerateCrudMutation(projectId)
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set())
 
   const schemas = listQuery.data ?? []
@@ -65,6 +80,29 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
       },
     )
   }
+
+  const handleGenerate = () => {
+    if (!selectedSchema) return
+    generateMutation.mutate(
+      { dbSchemaId: selectedSchema.id },
+      {
+        onSuccess: () => {
+          setGenerateOpen(false)
+          setSelectedSchema(null)
+        },
+      },
+    )
+  }
+
+  const generatedApis = selectedSchema
+    ? [
+        { method: 'GET', path: `/crud/${selectedSchema.objectName}/list`, name: `${selectedSchema.objectName} 列表` },
+        { method: 'POST', path: `/crud/${selectedSchema.objectName}`, name: `创建 ${selectedSchema.objectName}` },
+        { method: 'GET', path: `/crud/${selectedSchema.objectName}/detail`, name: `${selectedSchema.objectName} 详情` },
+        { method: 'PUT', path: `/crud/${selectedSchema.objectName}`, name: `更新 ${selectedSchema.objectName}` },
+        { method: 'DELETE', path: `/crud/${selectedSchema.objectName}`, name: `删除 ${selectedSchema.objectName}` },
+      ]
+    : []
 
   return (
     <Card className="bg-white">
@@ -103,7 +141,7 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
                 <TableHead>类型</TableHead>
                 <TableHead>列数</TableHead>
                 <TableHead>来源</TableHead>
-                <TableHead className="w-16"></TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -119,16 +157,33 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
                     {schema.dbSourceId ? '数据源同步' : '手动创建'}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-slate-500 hover:text-red-600"
-                      onClick={() => deleteMutation.mutate({ dbSchemaId: schema.id })}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-indigo-600"
+                        onClick={() => {
+                          setSelectedSchema(schema)
+                          setGenerateOpen(true)
+                        }}
+                        disabled={generateMutation.isPending}
+                        title="生成 CRUD API"
+                      >
+                        <Wand2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-500 hover:text-red-600"
+                        onClick={() => deleteMutation.mutate({ dbSchemaId: schema.id })}
+                        disabled={deleteMutation.isPending}
+                        title="删除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -194,6 +249,37 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={generateOpen} onOpenChange={setGenerateOpen}>
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-base">生成 CRUD API</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <span>将为数据模型</span>
+                <span className="font-medium">{selectedSchema?.objectName}</span>
+                <span>自动生成以下 5 个 API（保存为 draft）：</span>
+                <ul className="mt-2 space-y-1 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                  {generatedApis.map((api) => (
+                    <li key={api.path} className="flex items-center gap-2">
+                      <span className="w-14 font-mono text-xs text-slate-500">{api.method}</span>
+                      <span className="font-mono text-xs text-slate-700">{api.path}</span>
+                      <span className="ml-auto text-xs text-slate-500">{api.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedSchema(null)}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleGenerate}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? '生成中…' : '确认生成'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )
