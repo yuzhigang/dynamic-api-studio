@@ -88,8 +88,8 @@ dynamic-api-studio/
 │   │   ├── __root.tsx
 │   │   ├── _app.tsx
 │   │   └── _app/
-│   │       ├── index.tsx           # → 重定向到 /api-management
-│   │       ├── api-management/
+│   │       ├── index.tsx           # → 重定向到 /home
+│   │       ├── projects/
 │   │       │   ├── index.tsx
 │   │       │   ├── list.tsx
 │   │       │   ├── create.tsx
@@ -115,7 +115,7 @@ dynamic-api-studio/
 │   │       └── app-nav-config.ts    # 导航菜单配置
 │   │
 │   ├── modules/                    # 功能模块（pages + components + hooks + services）
-│   │   ├── api-management/
+│   │   ├── projects/
 │   │   │   ├── pages/              # 页面入口（路由引用）
 │   │   │   ├── components/
 │   │   │   │   ├── list/           # API 列表页组件
@@ -313,7 +313,7 @@ Provider 注册机制（design.md §10.2）：
 ### 状态管理
 
 - 服务端数据：TanStack Query（`useQuery` / `useMutation`），query keys 按模块定义在 `services/query-keys.ts`
-- 编辑器草稿状态：`modules/api-management/state/` 使用 `useReducer` 管理 designer 表单状态
+- 编辑器草稿状态：`modules/projects/state/` 使用 `useReducer` 管理 designer 表单状态
 - 跨模块共享状态：`shared/state/` 提供通用工具（dirty-check、undo-redo、tree-manipulation）
 
 ---

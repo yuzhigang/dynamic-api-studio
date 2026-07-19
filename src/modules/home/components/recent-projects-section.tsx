@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router'
 
 import { Button } from '@/components/ui/button'
-import { ProjectFormDialog } from '@/modules/project-management/components/project-form/project-form-dialog'
-import { ProjectCardGrid } from '@/modules/project-management/components/project-card/project-card-grid'
+import { ProjectFormDialog } from '@/modules/projects/components/project-form/project-form-dialog'
+import { ProjectCardGrid } from '@/modules/projects/components/project-card/project-card-grid'
 import type { Project } from '@/shared/contracts/project.contract'
 
 type RecentProjectsSectionProps = {

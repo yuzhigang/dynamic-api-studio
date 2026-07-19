@@ -4,8 +4,8 @@ import type { ReactNode } from 'react'
 
 import { AppBreadcrumb } from '@/layouts/app-shell/app-breadcrumb'
 import { AppHeaderSlotTarget } from '@/layouts/app-shell/app-header-actions'
-import { useApiDefinitionListQuery } from '@/modules/project-management/hooks/use-api-definition-query'
-import { useProjectQuery } from '@/modules/project-management/hooks/use-project-query'
+import { useApiDefinitionListQuery } from '@/modules/projects/hooks/use-api-definition-query'
+import { useProjectQuery } from '@/modules/projects/hooks/use-project-query'
 
 type BreadcrumbContext = {
   projectId?: string
