@@ -18,6 +18,7 @@ function toDraft(project: Project): ProjectDraft {
     description: project.description ?? '',
     icon: project.icon,
     color: project.color,
+    dbSourceId: project.dbSourceId,
   }
 }
 

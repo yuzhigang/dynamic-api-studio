@@ -10,6 +10,7 @@ export const projectSchema = z.object({
   icon: z.string().optional(),
   color: z.string().optional(),
   status: projectStatusSchema,
+  dbSourceId: z.string().optional(),
   apiCount: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -25,6 +26,7 @@ export const projectDraftSchema = z.object({
   description: z.string().optional(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  dbSourceId: z.string().optional(),
 })
 
 export type ProjectDraft = z.infer<typeof projectDraftSchema>

@@ -71,6 +71,8 @@ export interface ProjectTable extends AuditColumns {
   color: string | null
   status: Generated<ProjectStatus>
   api_count: Generated<number>
+  /** 项目关联的业务数据源（可空），一个 db_source 可被多个 project 引用。 */
+  db_source_id: string | null
 }
 
 /** 2. api — API 定义元信息（工作流步骤内嵌 JSON）。 */
@@ -125,10 +127,30 @@ export interface DbSourceTable extends AuditColumns {
   description: string | null
 }
 
-/** 5. db_schema — 数据源元数据缓存（表/列）。仅追加刷新，不软删除。 */
-export interface DbSchemaTable {
+/** 5. db_source_metadata — 真实数据源元数据缓存（表/列），供 SQL 编辑器补全。 */
+export interface DbSourceMetadataTable {
   id: string
   db_source_id: string
+  schema_name: string | null
+  object_type: DbObjectType
+  object_name: string
+  /** 列定义数组，结构见 db-model.md §6。 */
+  columns: unknown[]
+  /** 外键定义数组，结构见 db-model.md §6。 */
+  foreign_keys: unknown[] | null
+  /** 索引定义数组，结构见 db-model.md §6。 */
+  indexes: unknown[] | null
+  comment: string | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
+/** 5.5 db_schema — 项目级数据模型（table/view），用于生成 JSON Schema 与 CRUD API。 */
+export interface DbSchemaTable {
+  id: string
+  project_id: string
+  /** 来源数据源（数据库优先时填充；设计优先时可为空）。 */
+  db_source_id: string | null
   schema_name: string | null
   object_type: DbObjectType
   object_name: string
@@ -231,6 +253,7 @@ export interface Database {
   api: ApiTable
   json_schema: JsonSchemaTable
   db_source: DbSourceTable
+  db_source_metadata: DbSourceMetadataTable
   db_schema: DbSchemaTable
   variable: VariableTable
   custom_function: CustomFunctionTable

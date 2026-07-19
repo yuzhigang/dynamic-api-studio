@@ -19,6 +19,7 @@ function rowToProject(row: ProjectRow): Project {
     icon: row.icon ?? undefined,
     color: row.color ?? undefined,
     status: row.status,
+    dbSourceId: row.db_source_id ?? undefined,
     apiCount: row.api_count,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -74,6 +75,7 @@ export class ProjectRepository {
           description: draft.description ?? null,
           icon: draft.icon ?? existing.icon ?? null,
           color: draft.color ?? existing.color ?? null,
+          db_source_id: draft.dbSourceId ?? existing.dbSourceId ?? null,
           updated_at: new Date(),
         })
         .where('id', '=', id)
@@ -88,6 +90,7 @@ export class ProjectRepository {
           description: draft.description ?? null,
           icon: draft.icon ?? null,
           color: draft.color ?? null,
+          db_source_id: draft.dbSourceId ?? null,
           status: 'active',
           api_count: 0,
           created_at: new Date(),
@@ -132,6 +135,7 @@ export class ProjectRepository {
         description: source.description ?? null,
         icon: source.icon ?? null,
         color: source.color ?? null,
+        db_source_id: source.dbSourceId ?? null,
         status: 'active',
         api_count: 0,
         created_at: new Date(),

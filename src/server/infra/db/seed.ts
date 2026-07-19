@@ -23,6 +23,7 @@ const SEED_PROJECTS: Array<{
   color: string | null
   status: 'active' | 'archived'
   api_count: number
+  db_source_id: string | null
   created_at: Date
   updated_at: Date
 }> = [
@@ -35,6 +36,7 @@ const SEED_PROJECTS: Array<{
     color: 'blue',
     status: 'active',
     api_count: 6,
+    db_source_id: 'ds_order_oracle',
     created_at: SEED_TIMESTAMP,
     updated_at: SEED_TIMESTAMP,
   },
@@ -47,6 +49,7 @@ const SEED_PROJECTS: Array<{
     color: 'emerald',
     status: 'active',
     api_count: 0,
+    db_source_id: 'ds_crm_postgres',
     created_at: SEED_TIMESTAMP,
     updated_at: SEED_TIMESTAMP,
   },

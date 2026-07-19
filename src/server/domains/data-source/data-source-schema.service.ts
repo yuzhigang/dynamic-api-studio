@@ -50,7 +50,7 @@ export class DataSourceSchemaService {
 
   private async readCache(datasourceId: string): Promise<DataSourceSchemaTable[] | null> {
     const rows = await this.db
-      .selectFrom('db_schema')
+      .selectFrom('db_source_metadata')
       .selectAll()
       .where('db_source_id', '=', datasourceId)
       .execute()
@@ -72,13 +72,13 @@ export class DataSourceSchemaService {
 
   private async writeCache(datasourceId: string, schema: DataSourceSchema): Promise<void> {
     // 全量刷新：先删该数据源的旧行，再插新行。
-    await this.db.deleteFrom('db_schema').where('db_source_id', '=', datasourceId).execute()
+    await this.db.deleteFrom('db_source_metadata').where('db_source_id', '=', datasourceId).execute()
     const now = new Date()
     for (const table of schema.tables) {
       await this.db
-        .insertInto('db_schema')
+        .insertInto('db_source_metadata')
         .values({
-          id: createId('db_schema'),
+          id: createId('db_source_metadata'),
           db_source_id: datasourceId,
           schema_name: table.schemaName ?? null,
           object_type: table.objectType ?? 'table',
