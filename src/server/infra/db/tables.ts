@@ -245,6 +245,23 @@ export interface ScheduleTaskLogTable {
   created_at: Generated<Date>
 }
 
+/** db_migration.status */
+type DbMigrationStatus = 'draft' | 'applied' | 'failed'
+
+/** 11. db_migration — 从项目 db_schema 生成的业务数据源迁移记录。 */
+export interface DbMigrationTable {
+  id: string
+  project_id: string
+  db_schema_id: string | null
+  status: DbMigrationStatus
+  sql: string
+  generated_from_snapshot: unknown
+  error_message: string | null
+  applied_at: Date | null
+  created_at: Generated<Date>
+  updated_at: Generated<Date>
+}
+
 /**
  * 平台元数据库的 Kysely 类型入口。泛型参数传入 `Kysely<Database>` 即可获得类型安全的查询。
  */
@@ -260,4 +277,5 @@ export interface Database {
   api_invocation_log: ApiInvocationLogTable
   schedule_task: ScheduleTaskTable
   schedule_task_log: ScheduleTaskLogTable
+  db_migration: DbMigrationTable
 }

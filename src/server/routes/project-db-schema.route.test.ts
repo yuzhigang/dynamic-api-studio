@@ -77,24 +77,74 @@ describe.skipIf(!dbAvailable)('project-db-schema route generate-crud', () => {
     expect(body.apiIds).toHaveLength(5)
   })
 
-  it('returns 500 with conflict message when generating twice', async () => {
-    const objectName = `rtest_conflict_${Date.now()}`
-    const dbSchemaId = await insertTestDbSchema(objectName)
+  it('creates and updates a db_schema by design-first', async () => {
+    const objectName = `rtest_design_${Date.now()}`
 
-    const first = await app.request(`/projects/project_crm/db-schema/${dbSchemaId}/generate-crud`, {
+    const create = await app.request('/projects/project_crm/db-schema', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        projectId: 'project_crm',
+        objectType: 'table',
+        objectName,
+        columns: [{ name: 'id', dataType: 'integer', nullable: false, isPrimaryKey: true }],
+      }),
+    })
+    expect(create.status).toBe(200)
+    const created = await create.json()
+    expect(created.objectName).toBe(objectName)
+    expect(created.columns).toHaveLength(1)
+
+    const update = await app.request(`/projects/project_crm/db-schema/${created.id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        projectId: 'project_crm',
+        objectType: 'table',
+        objectName,
+        columns: [
+          { name: 'id', dataType: 'integer', nullable: false, isPrimaryKey: true },
+          { name: 'name', dataType: 'varchar', nullable: false, isPrimaryKey: false },
+        ],
+      }),
+    })
+    expect(update.status).toBe(200)
+    const updated = await update.json()
+    expect(updated.columns).toHaveLength(2)
+
+    const get = await app.request(`/projects/project_crm/db-schema/${created.id}`)
+    expect(get.status).toBe(200)
+    const fetched = await get.json()
+    expect(fetched.id).toBe(created.id)
+  })
+
+  it('returns 500 when design-first object name conflicts', async () => {
+    const objectName = `rtest_conflict_design_${Date.now()}`
+
+    const first = await app.request('/projects/project_crm/db-schema', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        projectId: 'project_crm',
+        objectType: 'table',
+        objectName,
+        columns: [{ name: 'id', dataType: 'integer', nullable: false, isPrimaryKey: true }],
+      }),
     })
     expect(first.status).toBe(200)
 
-    const second = await app.request(`/projects/project_crm/db-schema/${dbSchemaId}/generate-crud`, {
+    const second = await app.request('/projects/project_crm/db-schema', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        projectId: 'project_crm',
+        objectType: 'table',
+        objectName,
+        columns: [{ name: 'id', dataType: 'integer', nullable: false, isPrimaryKey: true }],
+      }),
     })
     expect(second.status).toBe(500)
     const body = await second.json()
-    expect(body.message).toContain('path+method 冲突')
+    expect(body.message).toContain('已存在')
   })
 })

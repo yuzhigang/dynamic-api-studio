@@ -26,6 +26,21 @@ export const projectDbSchemaSchema = z.object({
 
 export type ProjectDbSchema = z.infer<typeof projectDbSchemaSchema>
 
+/** 设计优先创建/编辑 db_schema 的请求体。 */
+export const projectDbSchemaDraftSchema = z.object({
+  id: z.string().optional(),
+  projectId: z.string().min(1),
+  schemaName: z.string().optional(),
+  objectType: projectDbSchemaObjectTypeSchema,
+  objectName: z.string().min(1),
+  columns: z.array(dataSourceSchemaColumnSchema).min(1, '至少需要一个列'),
+  foreignKeys: z.array(dataSourceSchemaForeignKeySchema).optional(),
+  indexes: z.array(dataSourceSchemaIndexSchema).optional(),
+  comment: z.string().optional(),
+})
+
+export type ProjectDbSchemaDraft = z.infer<typeof projectDbSchemaDraftSchema>
+
 /** 从数据源选择对象同步到项目 db_schema 的请求体。 */
 export const syncProjectDbSchemaFromSourceSchema = z.object({
   objectNames: z.array(z.string().min(1)).min(1, '至少选择一个表或视图'),

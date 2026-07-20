@@ -37,6 +37,9 @@ import {
   useSyncProjectDbSchemaMutation,
 } from '@/modules/projects/hooks/use-project-db-schema'
 import { useGenerateCrudMutation } from '@/modules/projects/hooks/use-generate-crud'
+import {
+  ProjectDbSchemaEditorButton,
+} from '@/modules/projects/components/project-db-schema/project-db-schema-editor-dialog'
 import type { ProjectDbSchema } from '@/shared/contracts/project-db-schema.contract'
 
 type ProjectDbSchemaSectionProps = {
@@ -108,19 +111,22 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
     <Card className="bg-white">
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">数据模型</CardTitle>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setSelectedNames(new Set())
-            setSyncOpen(true)
-          }}
-          disabled={sourceObjectsQuery.isLoading || sourceObjectsQuery.data?.available === false}
-        >
-          <Database className="mr-1.5 h-4 w-4" />
-          从数据源同步
-        </Button>
+        <div className="flex items-center gap-2">
+          <ProjectDbSchemaEditorButton projectId={projectId} mode="create" size="sm" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedNames(new Set())
+              setSyncOpen(true)
+            }}
+            disabled={sourceObjectsQuery.isLoading || sourceObjectsQuery.data?.available === false}
+          >
+            <Database className="mr-1.5 h-4 w-4" />
+            从数据源同步
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {sourceObjectsQuery.data?.available === false ? (
@@ -158,6 +164,12 @@ export function ProjectDbSchemaSection({ projectId }: ProjectDbSchemaSectionProp
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      <ProjectDbSchemaEditorButton
+                        projectId={projectId}
+                        mode="edit"
+                        dbSchemaId={schema.id}
+                        size="icon"
+                      />
                       <Button
                         type="button"
                         variant="ghost"

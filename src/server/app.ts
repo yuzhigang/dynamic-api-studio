@@ -9,6 +9,7 @@ import { homeOverviewRoute } from '@/server/routes/home-overview.route'
 import { healthRoute } from '@/server/routes/health.route'
 import { projectApiRoute } from '@/server/routes/project-api.route'
 import { projectCustomFunctionRoute } from '@/server/routes/project-custom-function.route'
+import { projectDbMigrationRoute } from '@/server/routes/project-db-migration.route'
 import { projectDbSchemaRoute } from '@/server/routes/project-db-schema.route'
 import { projectRoute } from '@/server/routes/project.route'
 import { projectVariableRoute } from '@/server/routes/project-variable.route'
@@ -31,6 +32,7 @@ app
   .route('/projects', projectVariableRoute)
   .route('/projects/:projectId/db-schema', projectDbSchemaRoute)
   .route('/projects', projectCustomFunctionRoute)
+  .route('/projects/:projectId/db-migrations', projectDbMigrationRoute)
   .route('/datasources', dataSourceRoute)
   .route('/global-variables', globalVariableRoute)
   .route('/sql', sqlAnalyzeRoute)

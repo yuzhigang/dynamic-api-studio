@@ -5,6 +5,7 @@ import { jsonbArray } from '@/server/infra/db/repository-helpers'
 import type { Database, DbSchemaTable } from '@/server/infra/db/tables'
 import type {
   ProjectDbSchema,
+  ProjectDbSchemaDraft,
   SyncProjectDbSchemaFromSource,
 } from '@/shared/contracts/project-db-schema.contract'
 import type { DataSourceSchemaTable } from '@/shared/contracts/data-source.contract'
@@ -102,6 +103,81 @@ export class ProjectDbSchemaRepository {
     }
 
     return created
+  }
+
+  async save(projectId: string, draft: ProjectDbSchemaDraft): Promise<ProjectDbSchema> {
+    const id = draft.id ?? createId('db_schema')
+    await this.assertNameUnique(projectId, draft.schemaName ?? null, draft.objectName, id)
+
+    const existing = await this.get(projectId, id)
+    const now = new Date()
+
+    if (existing) {
+      await this.db
+        .updateTable('db_schema')
+        .set({
+          schema_name: draft.schemaName ?? null,
+          object_type: draft.objectType,
+          object_name: draft.objectName,
+          columns: jsonbArray(draft.columns) as never,
+          foreign_keys: draft.foreignKeys ? jsonbArray(draft.foreignKeys) : null,
+          indexes: draft.indexes ? jsonbArray(draft.indexes) : null,
+          comment: draft.comment ?? null,
+          updated_at: now,
+        })
+        .where('id', '=', id)
+        .where('project_id', '=', projectId)
+        .execute()
+    } else {
+      await this.db
+        .insertInto('db_schema')
+        .values({
+          id,
+          project_id: projectId,
+          db_source_id: null,
+          schema_name: draft.schemaName ?? null,
+          object_type: draft.objectType,
+          object_name: draft.objectName,
+          columns: jsonbArray(draft.columns) as never,
+          foreign_keys: draft.foreignKeys ? jsonbArray(draft.foreignKeys) : null,
+          indexes: draft.indexes ? jsonbArray(draft.indexes) : null,
+          comment: draft.comment ?? null,
+          created_at: now,
+          updated_at: now,
+        })
+        .execute()
+    }
+
+    const saved = await this.get(projectId, id)
+    if (!saved) {
+      throw new Error(`[project-db-schema] save 后未找到数据模型 ${id}`)
+    }
+    return saved
+  }
+
+  private async assertNameUnique(
+    projectId: string,
+    schemaName: string | null,
+    objectName: string,
+    id: string,
+  ): Promise<void> {
+    let query = this.db
+      .selectFrom('db_schema')
+      .select('id')
+      .where('project_id', '=', projectId)
+      .where('object_name', '=', objectName)
+      .where('id', '<>', id)
+
+    if (schemaName === null) {
+      query = query.where('schema_name', 'is', null)
+    } else {
+      query = query.where('schema_name', '=', schemaName)
+    }
+
+    const conflict = await query.executeTakeFirst()
+    if (conflict) {
+      throw new Error(`数据模型「${schemaName ? `${schemaName}.` : ''}${objectName}」已存在`)
+    }
   }
 
   async delete(projectId: string, dbSchemaId: string): Promise<boolean> {
